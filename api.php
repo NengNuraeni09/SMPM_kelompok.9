@@ -341,6 +341,29 @@ switch ($action) {
         db()->prepare('DELETE FROM kelompok WHERE id=?')->execute([$id]);
         jsonOk();
 
+    /* ---------- RESET SEED PASSWORD (sekali pakai untuk fix password) ---------- */
+    case 'reset_seed_password':
+        // Endpoint sementara untuk reset password semua akun seed
+        // Hanya bisa diakses dengan token khusus
+        $token = $_GET['token'] ?? $_POST['token'] ?? '';
+        if ($token !== 'smpm_reset_2024') jsonErr('Token tidak valid.', 403);
+
+        $newHash = password_hash('password123', PASSWORD_BCRYPT);
+        $emails = [
+            'putri@kampus.ac.id',
+            'intan@kampus.ac.id',
+            'neng@kampus.ac.id',
+            'dzurrahman@kampus.ac.id',
+            'admin@kampus.ac.id',
+        ];
+        $stmt = db()->prepare('UPDATE users SET password = ? WHERE email = ?');
+        $updated = 0;
+        foreach ($emails as $email) {
+            $stmt->execute([$newHash, $email]);
+            $updated += $stmt->rowCount();
+        }
+        jsonOk(['updated' => $updated, 'message' => 'Password semua akun seed di-reset ke: password123']);
+
     default:
         jsonErr('Action tidak dikenal.', 404);
 }

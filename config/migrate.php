@@ -100,8 +100,8 @@ function runMigrations(PDO $pdo): void {
     $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
 
     // ---- SEED DATA ----
-    // Hash bcrypt untuk password 'password' — statis agar konsisten
-    $hash = '$2y$10$TKh8H1.PfbuNIJ6zMKMEmugzRrWyJgel5FGGRs8xKxDFY5.UE5Nqa';
+    // Generate hash PHP native untuk password 'password123'
+    $hash = password_hash('password123', PASSWORD_BCRYPT);
 
     $stmtUser = $pdo->prepare(
         'INSERT IGNORE INTO users (id, nama, nim, email, password, role, avatar, kelompok_id) VALUES (?,?,?,?,?,?,?,?)'
