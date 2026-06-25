@@ -88,7 +88,16 @@
           </div>
           <div class="form-group mb-8">
             <label class="form-label">Password</label>
-            <input id="login-pass" class="form-control" type="password" placeholder="••••••••" value="" required />
+            <div style="position:relative">
+              <input id="login-pass" class="form-control" type="password" placeholder="••••••••" value="" required style="padding-right:42px" />
+              <button type="button" id="login-pass-toggle"
+                onclick="(function(){var i=document.getElementById('login-pass');var b=document.getElementById('login-pass-toggle');i.type=i.type==='password'?'text':'password';b.innerHTML=i.type==='password'?'<svg width=&quot;16&quot; height=&quot;16&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2&quot;><path d=&quot;M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z&quot;/><circle cx=&quot;12&quot; cy=&quot;12&quot; r=&quot;3&quot;/></svg>':'<svg width=&quot;16&quot; height=&quot;16&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2&quot;><path d=&quot;M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24&quot;/><line x1=&quot;1&quot; y1=&quot;1&quot; x2=&quot;23&quot; y2=&quot;23&quot;/></svg>';})()"
+                style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-3);padding:4px;display:flex;align-items:center;transition:color .15s"
+                onmouseover="this.style.color='var(--text-2)'" onmouseout="this.style.color='var(--text-3)'"
+                tabindex="-1">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
           </div>
           <div style="display:flex;justify-content:flex-end;margin-bottom:20px">
             <a href="javascript:void(0)" onclick="handleForgotPassword()" style="font-size:.82rem;color:var(--accent);cursor:pointer;text-decoration:none" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">Lupa password?</a>
@@ -289,7 +298,7 @@
   <div id="page-dashboard" class="screen hidden">
     <div class="page-body">
       <div class="page-header">
-        <h1>Selamat Datang 👋</h1>
+        <h1>Selamat Datang</h1>
         <p id="dash-welcome">Ringkasan aktivitas proyek Anda hari ini.</p>
       </div>
       <div class="stat-grid" id="dash-stats"></div>

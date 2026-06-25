@@ -160,7 +160,7 @@ function renderDashboard() {
     // Calculate completion percentage
     const completionRate = myTugas.length > 0 ? Math.round((selesai / myTugas.length) * 100) : 0;
 
-    document.getElementById('dash-welcome').textContent = `Ringkasan aktivitas proyek Anda hari ini. Completion rate: ${completionRate}%`;
+    document.getElementById('dash-welcome').textContent = `Ringkasan aktivitas proyek Anda. Completion rate: ${completionRate}%`;
     
     document.getElementById('dash-stats').innerHTML = `
       <div class="stat-card"><div class="stat-label">Total Tugas</div><div class="stat-value">${myTugas.length}</div></div>
@@ -174,37 +174,41 @@ function renderDashboard() {
         <div class="card-title">Progress ${kelompok.nama}</div>
         <div class="flex items-center gap-16 mb-8">
           <div style="flex:1"><div class="text-sm text-muted mb-4">${kelompok.tema}</div></div>
-          <span style="font-family:var(--font-display);font-size:1.4rem;font-weight:800;color:var(--accent)">${kelompok.progress}%</span>
+          <span style="font-family:var(--font-display);font-size:1.4rem;font-weight:800;color:var(--accent);white-space:nowrap">${kelompok.progress}%</span>
         </div>
         <div class="progress-wrap"><div class="progress-fill progress-blue" style="width:${kelompok.progress}%"></div></div>
         
-        <!-- Task Completion Chart -->
-        <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border)">
-          <div class="text-sm font-600 mb-12"> Statistik Penyelesaian Tugas Anda</div>
-          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px">
-            <div style="text-align:center">
-              <div style="width:60px;height:60px;border-radius:50%;background:conic-gradient(var(--success) ${completionRate * 3.6}deg, var(--border) 0);margin:0 auto 8px;display:flex;align-items:center;justify-content:center">
-                <div style="width:45px;height:45px;border-radius:50%;background:var(--white);display:flex;align-items:center;justify-content:center">
-                  <span style="font-size:.75rem;font-weight:700">${completionRate}%</span>
+        <!-- Statistik ringkas 2x2 grid — mobile friendly -->
+        <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
+          <div class="text-sm font-600 mb-12">Statistik Penyelesaian Tugas</div>
+          <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+            <!-- Donut chart -->
+            <div style="text-align:center;flex-shrink:0">
+              <div style="width:64px;height:64px;border-radius:50%;background:conic-gradient(var(--success) ${completionRate * 3.6}deg, var(--border) 0deg);display:flex;align-items:center;justify-content:center;margin:0 auto 6px">
+                <div style="width:46px;height:46px;border-radius:50%;background:var(--white);display:flex;align-items:center;justify-content:center">
+                  <span style="font-size:.72rem;font-weight:700">${completionRate}%</span>
                 </div>
               </div>
-              <div class="text-xs text-muted">Completion</div>
+              <div style="font-size:.7rem;color:var(--text-3)">Selesai</div>
             </div>
-            <div style="background:var(--success-lt);padding:12px;border-radius:var(--radius-md)">
-              <div class="text-lg font-700" style="color:var(--success)">${selesai}</div>
-              <div class="text-xs text-muted">Selesai</div>
-            </div>
-            <div style="background:var(--accent-lt);padding:12px;border-radius:var(--radius-md)">
-              <div class="text-lg font-700" style="color:var(--accent)">${proses}</div>
-              <div class="text-xs text-muted">Proses</div>
-            </div>
-            <div style="background:var(--warning-lt);padding:12px;border-radius:var(--radius-md)">
-              <div class="text-lg font-700" style="color:var(--warning)">${pending}</div>
-              <div class="text-xs text-muted">Pending</div>
-            </div>
-            <div style="background:var(--danger-lt);padding:12px;border-radius:var(--radius-md)">
-              <div class="text-lg font-700" style="color:var(--danger)">${terlambat}</div>
-              <div class="text-xs text-muted">Terlambat</div>
+            <!-- 4 stat boxes 2x2 -->
+            <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:8px;min-width:160px">
+              <div style="background:var(--success-lt);padding:10px 12px;border-radius:var(--radius-md);text-align:center">
+                <div style="font-size:1.2rem;font-weight:800;color:var(--success)">${selesai}</div>
+                <div style="font-size:.7rem;color:var(--success)">Selesai</div>
+              </div>
+              <div style="background:var(--accent-lt);padding:10px 12px;border-radius:var(--radius-md);text-align:center">
+                <div style="font-size:1.2rem;font-weight:800;color:var(--accent)">${proses}</div>
+                <div style="font-size:.7rem;color:var(--accent)">Proses</div>
+              </div>
+              <div style="background:var(--warning-lt);padding:10px 12px;border-radius:var(--radius-md);text-align:center">
+                <div style="font-size:1.2rem;font-weight:800;color:var(--warning)">${pending}</div>
+                <div style="font-size:.7rem;color:var(--warning)">Pending</div>
+              </div>
+              <div style="background:var(--danger-lt);padding:10px 12px;border-radius:var(--radius-md);text-align:center">
+                <div style="font-size:1.2rem;font-weight:800;color:var(--danger)">${terlambat}</div>
+                <div style="font-size:.7rem;color:var(--danger)">Terlambat</div>
+              </div>
             </div>
           </div>
         </div>
