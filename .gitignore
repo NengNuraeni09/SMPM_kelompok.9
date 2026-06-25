@@ -1,8 +1,4 @@
-# Vendor & dependencies
-/vendor/
-/node_modules/
-
-# File upload user (jangan push ke git, gunakan cloud storage di production)
+# File upload user (jangan push ke git)
 /uploads/*
 !/uploads/.gitkeep
 !/uploads/.htaccess
@@ -10,10 +6,8 @@
 # Environment & secrets
 .env
 .env.local
-*.env
 
 # IDE & OS
-.vscode/
 .idea/
 *.DS_Store
 Thumbs.db
@@ -21,6 +15,3 @@ Thumbs.db
 # Log files
 *.log
 /logs/
-
-# Setup script — hapus setelah dipakai
-setup.php

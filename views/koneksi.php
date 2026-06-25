@@ -1,5 +1,10 @@
 <?php
 $url = getenv("DATABASE_URL");
+
+if (!$url) {
+    die("DATABASE_URL tidak ditemukan");
+}
+
 $db = parse_url($url);
 
 $host = $db["host"];
@@ -12,6 +17,4 @@ $conn = mysqli_connect($host, $user, $pass, $dbname);
 if (!$conn) {
     die("Koneksi gagal: " . mysqli_connect_error());
 }
-
-echo "Koneksi berhasil!";
 ?>

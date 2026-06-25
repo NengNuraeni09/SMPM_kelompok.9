@@ -1,42 +1,42 @@
 # SMPM — Sistem Manajemen Proyek Mahasiswa
 
-Aplikasi manajemen proyek berbasis web untuk mahasiswa, dosen, dan admin.  
-Dibangun dengan **PHP MVC** murni (tanpa framework), MySQL, HTML/CSS/JS.
+Sistem manajemen proyek berbasis web untuk mahasiswa, dosen, dan admin.  
+Tampilan identik dengan versi asli — backend PHP MVC terhubung via `api.php`.
 
 ---
 
-## 🚀 Deploy ke Railway
+## 🚀 Cara Deploy ke Railway (5 menit)
 
 ### 1. Push ke GitHub
 ```bash
 git init
 git add .
-git commit -m "Initial commit"
-git remote add origin https://github.com/USERNAME/SMPM.git
+git commit -m "SMPM - ready to deploy"
+git branch -M main
+git remote add origin https://github.com/USERNAME/smpm.git
 git push -u origin main
 ```
 
-### 2. Buat project di Railway
-1. Buka [railway.app](https://railway.app) → Login
-2. Klik **"New Project"** → **"Deploy from GitHub repo"**
-3. Pilih repo SMPM kamu
-4. Railway otomatis deteksi PHP dan deploy
+### 2. Deploy di Railway
+1. Buka [railway.app](https://railway.app) → login GitHub
+2. **New Project** → **Deploy from GitHub repo** → pilih repo SMPM
+3. Railway otomatis deploy (±2 menit)
 
-### 3. Tambahkan MySQL Plugin
-1. Di Railway project → klik **"+ New"** → **"Database"** → **"MySQL"**
-2. Railway otomatis inject env variables:
-   - `MYSQLHOST`, `MYSQLPORT`, `MYSQLDATABASE`, `MYSQLUSER`, `MYSQLPASSWORD`
+### 3. Tambah MySQL
+1. Di project Railway → **+ New** → **Database** → **MySQL**
+2. Klik service PHP → tab **Variables** → pastikan ada `MYSQLHOST`, dll
+3. Klik **Redeploy**
 
-### 4. Inisialisasi Database
-Setelah deploy, buka URL:
-```
-https://nama-app.up.railway.app/setup.php?token=smpm_setup_2024
-```
-Ini akan membuat tabel dan seed data demo.
+> Saat pertama dibuka, sistem **otomatis buat semua tabel + data demo**.  
+> Tidak perlu jalankan SQL manual.
 
-> ⚠️ Setelah setup berhasil, hapus `setup.php` dari repository!
+### 4. Buka URL
+Railway akan beri URL seperti `smpm-xxx.up.railway.app`
 
-### 5. Akun Demo
+---
+
+## 🔑 Akun Demo
+
 | Role | Email | Password |
 |------|-------|----------|
 | Admin | admin@kampus.ac.id | password |
@@ -47,41 +47,31 @@ Ini akan membuat tabel dan seed data demo.
 
 ## 💻 Jalankan Lokal (Laragon)
 
-1. Copy folder `SMPM` ke `C:\laragon\www\`
-2. Buka Laragon → Start All
-3. Import `init.sql` ke HeidiSQL / phpMyAdmin
-4. Buka `http://smpm.test` atau `http://localhost/SMPM`
+1. Copy folder ke `C:\laragon\www\SMPM\`
+2. Start Laragon → Start All
+3. Buka `http://localhost/SMPM`
+4. Tabel otomatis dibuat saat pertama diakses
 
 ---
 
-## 🏗 Struktur MVC
+## 🏗 Struktur File
 
 ```
 SMPM/
-├── index.php              ← Front Controller
+├── index.php        ← Entry (serve index.html + inject session)
+├── api.php          ← Backend API (JSON endpoint)
+├── index.html       ← Tampilan asli (tidak diubah)
 ├── config/
-│   └── database.php       ← Koneksi DB (auto-detect Railway env)
-├── models/                ← Data layer (PDO)
-├── controllers/           ← Business logic
-├── views/                 ← Template PHP
-│   ├── layout/            ← Header, sidebar, footer
-│   ├── auth/              ← Login
-│   ├── dashboard/         ← Dashboard per role
-│   ├── tugas/             ← Halaman tugas
-│   └── admin/             ← Halaman admin
+│   ├── database.php ← Koneksi PDO (Railway + lokal)
+│   └── migrate.php  ← Auto-create tabel + seed data
+├── js/
+│   ├── app.js       ← Frontend asli (tidak diubah)
+│   └── backend.js   ← Override: hubungkan app.js ke api.php
 ├── css/style.css
-├── js/app.js
-└── uploads/               ← File upload user
+├── uploads/         ← File tugas yang diupload
+├── nixpacks.toml    ← Config PHP untuk Railway
+└── Procfile         ← Start command Railway
 ```
-
----
-
-## 📋 Teknologi
-
-- **Backend**: PHP 8.1+ (MVC, PDO, bcrypt)
-- **Database**: MySQL 8
-- **Frontend**: Vanilla JS, CSS custom (no framework)
-- **Deploy**: Railway + GitHub
 
 ---
 
