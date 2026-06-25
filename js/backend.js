@@ -312,25 +312,78 @@ async function submitPenilaian(kelompokId) {
   showToast('Penilaian berhasil disimpan!', 'success');
 }
 
-// Admin: tambah user
-async function submitTambahUser() {
-  const nama       = document.getElementById('admin-user-nama')?.value.trim();
-  const nim        = document.getElementById('admin-user-nim')?.value.trim();
-  const email      = document.getElementById('admin-user-email')?.value.trim();
-  const password   = document.getElementById('admin-user-pass')?.value;
-  const role       = document.getElementById('admin-user-role')?.value;
-  const kelompokId = document.getElementById('admin-user-kelompok')?.value || null;
-  const res = await apiPost('add_user', { nama, nim, email, password, role, kelompok_id: kelompokId });
+// ============================================================
+// OVERRIDE CRUD USER — ganti fungsi app.js yang pakai mock DB
+// ============================================================
+
+// Override submitAddUser (dipanggil dari modal di app.js)
+async function submitAddUser() {
+  const nama  = document.getElementById('add-nama')?.value.trim();
+  const nim   = document.getElementById('add-nim')?.value.trim();
+  const email = document.getElementById('add-email')?.value.trim();
+  const pass  = document.getElementById('add-pass')?.value;
+  const role  = document.getElementById('add-role')?.value || 'mahasiswa';
+  const kelompokSelect = document.getElementById('add-kelompok');
+  const kelompokId = (role === 'mahasiswa' && kelompokSelect?.value) ? kelompokSelect.value : null;
+
+  if (!nama || !nim || !email || !pass) { showToast('Semua field wajib diisi', 'error'); return; }
+  if (role === 'mahasiswa' && !kelompokId) { showToast('Mahasiswa harus memilih kelompok!', 'error'); return; }
+
+  const btn = document.querySelector('#modal-body .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Menyimpan...'; }
+
+  const res = await apiPost('add_user', { nama, nim, email, password: pass, role, kelompok_id: kelompokId });
+
+  if (btn) { btn.disabled = false; btn.textContent = 'Simpan User'; }
+
   if (!res.ok) { showToast(res.message || 'Gagal menambah user.', 'error'); return; }
+
   await loadDB();
   closeModal();
   renderManageUser();
   showToast('User berhasil ditambahkan!', 'success');
 }
 
-// Admin: hapus user
-async function konfirmasiHapusUser(userId) {
-  const res = await apiPost('delete_user', { id: userId });
+// Override submitEditUser (dipanggil dari modal edit di app.js)
+async function submitEditUser(userId) {
+  const nama  = document.getElementById('edit-nama')?.value.trim();
+  const nim   = document.getElementById('edit-nim')?.value.trim();
+  const email = document.getElementById('edit-email')?.value.trim();
+  const pass  = document.getElementById('edit-pass')?.value;
+  const role  = document.getElementById('edit-role')?.value || 'mahasiswa';
+  const kelompokSelect = document.getElementById('edit-kelompok');
+  const kelompokId = (role === 'mahasiswa' && kelompokSelect?.value) ? kelompokSelect.value : null;
+
+  if (!nama || !nim || !email) { showToast('Nama, NIM, dan Email wajib diisi', 'error'); return; }
+
+  const payload = { id: userId, nama, nim, email, role, kelompok_id: kelompokId };
+  if (pass) payload.password = pass;
+
+  const btn = document.querySelector('#modal-body .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Menyimpan...'; }
+
+  const res = await apiPost('update_user', payload);
+
+  if (btn) { btn.disabled = false; btn.textContent = 'Simpan Perubahan'; }
+
+  if (!res.ok) { showToast(res.message || 'Gagal memperbarui user.', 'error'); return; }
+
+  // Kalau edit diri sendiri, update currentUser
+  if (+userId === +currentUser.id) {
+    currentUser = { ...currentUser, ...res.data };
+    buildSidebar();
+  }
+
+  await loadDB();
+  closeModal();
+  renderManageUser();
+  showToast('User berhasil diperbarui!', 'success');
+}
+
+// Override deleteUser (dipanggil dari konfirmasi modal di app.js)
+async function deleteUser(id) {
+  if (+id === +currentUser.id) { showToast('Tidak bisa menghapus akun sendiri', 'error'); return; }
+  const res = await apiPost('delete_user', { id });
   if (!res.ok) { showToast(res.message || 'Gagal menghapus user.', 'error'); return; }
   await loadDB();
   closeModal();
@@ -338,21 +391,70 @@ async function konfirmasiHapusUser(userId) {
   showToast('User berhasil dihapus!', 'success');
 }
 
-// Admin: tambah kelompok
-async function submitTambahKelompok() {
-  const nama     = document.getElementById('admin-kel-nama')?.value.trim();
-  const tema     = document.getElementById('admin-kel-tema')?.value.trim();
-  const dosenId  = document.getElementById('admin-kel-dosen')?.value || null;
-  const status   = document.getElementById('admin-kel-status')?.value || 'aktif';
-  const res = await apiPost('add_kelompok', { nama, tema, dosen_id: dosenId, status });
+// Admin: tambah user (alias lama — tetap ada untuk kompatibilitas)
+async function submitTambahUser() { await submitAddUser(); }
+
+// Admin: hapus user (alias lama)
+async function konfirmasiHapusUser(userId) { await deleteUser(userId); }
+
+// ============================================================
+// OVERRIDE CRUD KELOMPOK — ganti fungsi app.js yang pakai mock DB
+// ============================================================
+
+// Override simpanKelompokBaru (dipanggil dari modal di app.js)
+async function simpanKelompokBaru() {
+  const nama     = document.getElementById('kk-nama')?.value.trim();
+  const tema     = document.getElementById('kk-tema')?.value.trim();
+  const dosenId  = document.getElementById('kk-dosen')?.value || null;
+
+  if (!nama) { showToast('Nama kelompok wajib diisi!', 'error'); return; }
+  if (!tema) { showToast('Tema proyek wajib diisi!', 'error'); return; }
+
+  // Cek duplikat nama di DB lokal dulu
+  if (DB.kelompok.find(k => k.nama.toLowerCase() === nama.toLowerCase())) {
+    showToast(`Nama "${nama}" sudah digunakan!`, 'error'); return;
+  }
+
+  const btn = document.querySelector('#modal-body .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Menyimpan...'; }
+
+  const res = await apiPost('add_kelompok', { nama, tema, dosen_id: dosenId, status: 'aktif' });
+
+  if (btn) { btn.disabled = false; btn.textContent = 'Simpan'; }
   if (!res.ok) { showToast(res.message || 'Gagal menambah kelompok.', 'error'); return; }
+
   await loadDB();
   closeModal();
   renderManageKelompok();
-  showToast('Kelompok berhasil ditambahkan!', 'success');
+  showToast(`Kelompok "${nama}" berhasil ditambahkan!`, 'success');
 }
 
-// Admin: hapus kelompok
+// Override updateKelompok (dipanggil dari modal edit di app.js)
+async function updateKelompok(kelompokId) {
+  const nama     = document.getElementById('ek-nama')?.value.trim();
+  const tema     = document.getElementById('ek-tema')?.value.trim();
+  const dosenId  = document.getElementById('ek-dosen')?.value || null;
+  const progress = parseInt(document.getElementById('ek-progress')?.value) || 0;
+  const status   = document.getElementById('ek-status')?.value || 'aktif';
+
+  if (!nama) { showToast('Nama kelompok wajib diisi!', 'error'); return; }
+  if (!tema) { showToast('Tema proyek wajib diisi!', 'error'); return; }
+
+  const btn = document.querySelector('#modal-body .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Menyimpan...'; }
+
+  const res = await apiPost('update_kelompok', { id: kelompokId, nama, tema, dosen_id: dosenId, progress, status });
+
+  if (btn) { btn.disabled = false; btn.textContent = 'Simpan Perubahan'; }
+  if (!res.ok) { showToast(res.message || 'Gagal memperbarui kelompok.', 'error'); return; }
+
+  await loadDB();
+  closeModal();
+  renderManageKelompok();
+  showToast('Kelompok berhasil diperbarui!', 'success');
+}
+
+// Override konfirmasiHapusKelompok (dipanggil dari konfirmasi modal di app.js)
 async function konfirmasiHapusKelompok(kelompokId) {
   const res = await apiPost('delete_kelompok', { id: kelompokId });
   if (!res.ok) { showToast(res.message || 'Gagal menghapus kelompok.', 'error'); return; }
@@ -361,6 +463,9 @@ async function konfirmasiHapusKelompok(kelompokId) {
   renderManageKelompok();
   showToast('Kelompok berhasil dihapus!', 'success');
 }
+
+// Admin: tambah kelompok (alias lama)
+async function submitTambahKelompok() { await simpanKelompokBaru(); }
 
 // Handle upload dari halaman Upload (bukan modal)
 function handleUpload() {
@@ -389,3 +494,83 @@ function handleUpload() {
     })
     .catch(() => showToast('Koneksi gagal. Coba lagi.', 'error'));
 }
+
+// ============================================================
+// OVERRIDE CRUD TUGAS — ganti fungsi app.js yang pakai mock DB
+// ============================================================
+
+// Override submitTambahTugas (dipanggil dari modal tambah tugas dosen)
+async function submitTambahTugas(kelompokId) {
+  const judul    = document.getElementById('tt-judul')?.value.trim();
+  const assignee = document.getElementById('tt-assignee')?.value || null;
+  const deadline = document.getElementById('tt-deadline')?.value;
+  const status   = document.getElementById('tt-status')?.value || 'pending';
+  const deskripsi= document.getElementById('tt-desc')?.value.trim() || '';
+
+  if (!judul)    { showToast('Judul tugas wajib diisi!', 'error'); return; }
+  if (!deadline) { showToast('Deadline wajib diisi!', 'error'); return; }
+
+  const btn = document.querySelector('#modal-body .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Menyimpan...'; }
+
+  const res = await apiPost('add_tugas', {
+    judul, kelompok_id: kelompokId,
+    assignee_id: assignee, deadline, status, deskripsi
+  });
+
+  if (btn) { btn.disabled = false; btn.textContent = 'Simpan Tugas'; }
+  if (!res.ok) { showToast(res.message || 'Gagal menambah tugas.', 'error'); return; }
+
+  await loadDB();
+  closeModal();
+  renderTugasDosen();
+  showToast(`Tugas "${judul}" berhasil ditambahkan!`, 'success');
+}
+
+// Override confirmHapusTugas (dipanggil dari modal konfirmasi di app.js)
+async function confirmHapusTugas(tugasId, kelompokId) {
+  const res = await apiPost('delete_tugas', { id: tugasId });
+  if (!res.ok) { showToast(res.message || 'Gagal menghapus tugas.', 'error'); return; }
+  await loadDB();
+  closeModal();
+  renderTugasDosen();
+  showToast('Tugas berhasil dihapus!', 'success');
+}
+
+// ============================================================
+// OVERRIDE PENILAIAN — ganti fungsi app.js yang pakai mock DB
+// ============================================================
+
+// Override simpanNilai (dipanggil inline dari render penilaian di app.js)
+async function simpanNilai(kelompokId) {
+  const nilaiInput    = document.getElementById(`nilai-${kelompokId}`);
+  const feedbackInput = document.getElementById(`feedback-${kelompokId}`);
+  const nilaiVal      = nilaiInput ? parseInt(nilaiInput.value) : null;
+  const feedbackVal   = feedbackInput ? feedbackInput.value.trim() : '';
+
+  if (!nilaiInput?.value)                           { showToast('Masukkan nilai terlebih dahulu!', 'error'); return; }
+  if (isNaN(nilaiVal) || nilaiVal < 0 || nilaiVal > 100) { showToast('Nilai harus antara 0-100!', 'error'); return; }
+
+  const res = await apiPost('save_penilaian', {
+    kelompok_id: kelompokId,
+    nilai:       nilaiVal,
+    feedback:    feedbackVal
+  });
+  if (!res.ok) { showToast(res.message || 'Gagal menyimpan penilaian.', 'error'); return; }
+
+  // Update local DB agar grade badge langsung berubah
+  await loadDB();
+
+  const gradeEl = document.getElementById(`grade-${kelompokId}`);
+  if (gradeEl) {
+    const grade = nilaiVal >= 85 ? '<span class="badge badge-green">A</span>'
+                : nilaiVal >= 70 ? '<span class="badge badge-navy">B</span>'
+                : nilaiVal >= 55 ? '<span class="badge badge-amber">C</span>'
+                :                  '<span class="badge badge-red">D</span>';
+    gradeEl.innerHTML = grade;
+  }
+  showToast(`Nilai Kelompok berhasil disimpan!`, 'success');
+}
+
+// Alias: submitPenilaian (dipakai di beberapa tempat)
+async function submitPenilaian(kelompokId) { await simpanNilai(kelompokId); }
