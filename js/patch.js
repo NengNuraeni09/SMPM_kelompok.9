@@ -15,6 +15,17 @@
 sessionStorage.removeItem('smpm_user');
 window.checkSession = function() { return false; };
 
+// Override fungsi logout() bawaan app.js agar selalu hit server
+window.logout = function() {
+  sessionStorage.removeItem('smpm_user');
+  fetch('api.php?action=logout', { method: 'POST' })
+    .finally(function() {
+      currentUser = null;
+      if (typeof smpmGoToLogin === 'function') smpmGoToLogin();
+      else window.location.reload();
+    });
+};
+
 /* ============================================================
    API HELPERS
    ============================================================ */
@@ -149,20 +160,31 @@ function smpmPatchForms() {
     }, true); // capture: true = jalan sebelum listener app.js
   }
 
-  /* --- LOGOUT --- */
-  var logoutBtn = document.getElementById('logout-btn');
-  if (logoutBtn && !logoutBtn._smpmPatched) {
-    logoutBtn._smpmPatched = true;
-    // clone untuk hapus listener lama app.js
-    var newBtn = logoutBtn.cloneNode(true);
-    logoutBtn.parentNode.replaceChild(newBtn, logoutBtn);
-    newBtn.addEventListener('click', function() {
-      smpmPost('logout').finally(function() {
-        currentUser = null;
-        smpmGoToLogin();
-        setTimeout(smpmPatchForms, 50);
-      });
-    });
+  /* --- LOGOUT: event delegation di sidebar-footer agar
+        tahan terhadap buildSidebar() yang merender ulang DOM --- */
+  var sidebarFooter = document.querySelector('.sidebar-footer');
+  if (sidebarFooter && !sidebarFooter._smpmLogoutPatched) {
+    sidebarFooter._smpmLogoutPatched = true;
+    sidebarFooter.addEventListener('click', function(e) {
+      // Cari tombol logout yang diklik (bisa klik icon atau teks di dalamnya)
+      var btn = e.target.closest('#logout-btn');
+      if (!btn) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      btn.disabled = true;
+      btn.style.opacity = '0.6';
+      smpmPost('logout')
+        .finally(function() {
+          currentUser = null;
+          sessionStorage.removeItem('smpm_user');
+          smpmGoToLogin();
+          setTimeout(function() {
+            btn.disabled = false;
+            btn.style.opacity = '';
+            smpmPatchForms();
+          }, 100);
+        });
+    }, true); // capture: true agar intercept sebelum app.js
   }
 
   /* --- REGISTER --- */
