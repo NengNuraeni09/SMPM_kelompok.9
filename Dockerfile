@@ -9,5 +9,5 @@ WORKDIR /app
 # Copy semua file project
 COPY . .
 
-# Jalankan PHP built-in server
-CMD php -S 0.0.0.0:$PORT -t .
+# Jalankan PHP built-in server (pakai sh -c agar $PORT ter-expand)
+CMD ["sh", "-c", "php -S 0.0.0.0:${PORT:-8080} -t ."]
