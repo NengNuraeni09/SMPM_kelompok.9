@@ -98,10 +98,13 @@ function smpmLoadDB() {
 
 /* ============================================================
    INIT — patch.js jalan setelah app.js selesai
-   app.js sudah menampilkan halaman login karena
-   checkSession() mock return false.
-   Kita override itu di sini.
+   PERTAMA: langsung patch forms untuk buang listener mock
+   KEDUA: cek session dan load data
    ============================================================ */
+
+// Patch forms SEGERA — sebelum user sempat klik (hapus listener mock dari app.js)
+smpmPatchForms();
+
 (function smpmInit() {
   var sess = window.__SMPM_SESSION__;
 
@@ -109,14 +112,11 @@ function smpmLoadDB() {
     // Ada session PHP → load DB lalu ke dashboard
     currentUser = sess;
     smpmLoadDB().then(function() {
-      smpmPatchForms();
       buildSidebar();
       showPage('dashboard');
     });
   } else {
-    // Tidak ada session → tetap di halaman login (app.js sudah tampilkan ini)
-    smpmPatchForms();
-    // Patch showRegisterPage dropdown
+    // Tidak ada session → tetap di halaman login
     smpmPatchRegisterPage();
   }
 })();
@@ -139,6 +139,10 @@ function smpmPatchForms() {
       var infoEl = document.getElementById('login-info');
       var btn   = newForm.querySelector('button[type="submit"]');
       email = email.trim();
+
+      // Sembunyikan error lama segera
+      if (errEl)  errEl.classList.add('hidden');
+      if (infoEl) infoEl.classList.add('hidden');
 
       if (btn) { btn.disabled = true; btn.textContent = 'Masuk...'; }
 
