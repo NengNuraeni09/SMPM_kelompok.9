@@ -1,8 +1,5 @@
-Buat file koneksi PHP:
-
 <?php
 $url = getenv("DATABASE_URL");
-
 $db = parse_url($url);
 
 $host = $db["host"];

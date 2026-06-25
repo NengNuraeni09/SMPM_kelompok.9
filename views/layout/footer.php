@@ -18,7 +18,7 @@
   <div class="modal" id="modal-body"></div>
 </div>
 
-<script src="js/app.js"></script>
+<script src="/js/app.js"></script>
 <script>
   // Auto-dismiss flash toast
   const ft = document.getElementById('flash-toast');
