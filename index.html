@@ -35,7 +35,17 @@
 
 <!-- ========== TOPBAR ========== -->
 <header class="topbar" id="topbar">
-  <div class="topbar-title" id="topbar-title">Dashboard</div>
+  <div class="topbar-left">
+    <!-- Hamburger — hanya muncul di mobile -->
+    <button class="hamburger-btn" id="hamburger-btn" title="Menu" onclick="toggleMobileSidebar()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="3" y1="6" x2="21" y2="6"/>
+        <line x1="3" y1="12" x2="21" y2="12"/>
+        <line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </button>
+    <div class="topbar-title" id="topbar-title">Dashboard</div>
+  </div>
   <div class="topbar-actions">
     <div class="icon-btn notif-dot" title="Notifikasi">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/></svg>
@@ -435,6 +445,9 @@
   </div>
 
 </div><!-- /main-content -->
+
+<!-- ========== SIDEBAR OVERLAY (mobile) ========== -->
+<div id="sidebar-overlay" onclick="closeMobileSidebar()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99;backdrop-filter:blur(2px)"></div>
 
 <!-- ========== MODAL ========== -->
 <div id="modal-overlay" class="modal-overlay hidden">
