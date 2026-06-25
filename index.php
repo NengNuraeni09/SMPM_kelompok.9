@@ -36,6 +36,18 @@ spl_autoload_register(function (string $class): void {
     }
 });
 
+// ============================================================
+// AUTO MIGRATE — buat tabel & seed data jika belum ada
+// ============================================================
+require_once __DIR__ . '/config/database.php';
+require_once __DIR__ . '/config/migrate.php';
+try {
+    runMigrations(Database::getConnection());
+} catch (PDOException $e) {
+    // Jangan block aplikasi kalau migrate gagal karena race condition
+    error_log('Migration error: ' . $e->getMessage());
+}
+
 // Ambil parameter routing
 $page   = $_GET['page']   ?? 'login';
 $action = $_GET['action'] ?? null;
