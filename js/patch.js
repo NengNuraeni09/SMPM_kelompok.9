@@ -150,9 +150,8 @@ function smpmPatchForms() {
     newBtn.addEventListener('click', function() {
       smpmPost('logout').finally(function() {
         currentUser = null;
-        showPage('login');
-        // Re-patch setelah halaman login tampil
-        setTimeout(smpmPatchForms, 100);
+        smpmGoToLogin();
+        setTimeout(smpmPatchForms, 50);
       });
     });
   }
@@ -187,12 +186,51 @@ function smpmPatchRegisterPage() {
     };
     window.showRegisterPage._smpmPatched = true;
   }
+
+  // Patch showLoginPage agar sidebar/topbar benar-benar tersembunyi
+  var origLogin = window.showLoginPage;
+  if (origLogin && !origLogin._smpmPatched) {
+    window.showLoginPage = function() {
+      origLogin();
+      smpmGoToLogin(); // pastikan sidebar tersembunyi
+      smpmPatchForms();
+    };
+    window.showLoginPage._smpmPatched = true;
+  }
+}
+
+/* ============================================================
+   HELPER: tampilkan halaman login dengan bersih
+   Pastikan sidebar/topbar tersembunyi dan tidak ada
+   konten dashboard yang terlihat
+   ============================================================ */
+function smpmGoToLogin() {
+  // Sembunyikan sidebar & topbar dulu
+  var sidebar = document.getElementById('sidebar');
+  var topbar  = document.getElementById('topbar');
+  var mc      = document.getElementById('main-content');
+  if (sidebar) { sidebar.classList.add('hidden'); sidebar.classList.remove('open'); }
+  if (topbar)  topbar.classList.add('hidden');
+  if (mc)      mc.style.marginLeft = '0';
+  closeMobileSidebar();
+  // Sembunyikan semua page
+  ['login','dashboard','tugas','deadline','upload','kelompok','nilaiSaya',
+   'tugasDosen','monitoring','penilaian','manageUser','manageKelompok','register'].forEach(function(p) {
+    var el = document.getElementById('page-' + p);
+    if (el) el.classList.add('hidden');
+  });
+  // Tampilkan halaman login
+  var loginPage = document.getElementById('page-login');
+  if (loginPage) loginPage.classList.remove('hidden');
+  // Hapus error yang mungkin muncul dari session sebelumnya
+  var errEl = document.getElementById('login-error');
+  if (errEl) errEl.classList.add('hidden');
 }
 
 /* ============================================================
    INIT
    ============================================================ */
-// Patch forms SEGERA saat script ini jalan (setelah DOMContentLoaded app.js selesai)
+// Patch forms SEGERA saat script ini jalan
 smpmPatchForms();
 
 (function smpmInit() {
@@ -205,7 +243,8 @@ smpmPatchForms();
       smpmPatchNavItems();
     });
   } else {
-    showPage('login');
+    // Tidak ada session — pastikan tampilan login bersih
+    smpmGoToLogin();
     smpmPatchRegisterPage();
   }
 })();
@@ -244,13 +283,17 @@ function smpmHandleRegister() {
       }
       if (!res.ok) return showErr(res.message || 'Pendaftaran gagal.');
       if (errorDiv) errorDiv.classList.add('hidden');
-      currentUser = res.data;
-      smpmLoadDB().then(function() {
-        buildSidebar();
-        showPage('dashboard');
-        smpmPatchNavItems();
-        showToast('Akun berhasil dibuat! Selamat datang, ' + currentUser.nama, 'success');
-      });
+
+      // Setelah daftar berhasil → kembali ke halaman login dengan pesan sukses
+      // (tidak langsung masuk karena perlu admin verifikasi / login manual)
+      smpmGoToLogin();
+      smpmPatchForms();
+      // Isi otomatis email di form login
+      var loginEmail = document.getElementById('login-email');
+      var loginPass  = document.getElementById('login-pass');
+      if (loginEmail) loginEmail.value = email;
+      if (loginPass)  loginPass.value  = '';
+      showToast('✅ Akun berhasil dibuat! Silakan masuk dengan akun Anda.', 'success');
     })
     .catch(function() {
       if (btn) { btn.disabled = false; btn.textContent = 'Daftar Sekarang'; }
