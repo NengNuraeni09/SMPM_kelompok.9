@@ -19,15 +19,13 @@ $sessionUser = isset($_SESSION['user']) ? json_encode($_SESSION['user']) : 'null
 
 $html = file_get_contents(__DIR__ . '/index.html');
 
-// Inject: session + backend-pre.js SEBELUM app.js, backend.js SETELAH app.js
-$before = '<script>window.__SMPM_SESSION__ = ' . $sessionUser . ';</script>' . "\n"
-        . '<script src="js/backend-pre.js"></script>' . "\n";
-
-$after  = '<script src="js/backend.js"></script>';
-
+// Inject window.__SMPM_SESSION__ + patch.js setelah app.js
+// patch.js mengganti DOMContentLoaded app.js agar pakai API
 $html = str_replace(
     '<script src="js/app.js"></script>',
-    $before . '<script src="js/app.js"></script>' . "\n" . $after,
+    '<script>window.__SMPM_SESSION__ = ' . $sessionUser . ';</script>' . "\n" .
+    '<script src="js/app.js"></script>' . "\n" .
+    '<script src="js/patch.js"></script>',
     $html
 );
 
