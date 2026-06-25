@@ -1,15 +1,28 @@
 <?php
 /* =============================================
    SMPM — Config: Database Connection
-   Support local (Laragon) & Railway (env vars)
+   Support local (Laragon) & Railway (DATABASE_URL)
    ============================================= */
 
-// Railway inject env vars dengan nama DB_HOST, DB_PORT, dll.
-define('DB_HOST',    getenv('DB_HOST')       ?: getenv('MYSQLHOST')     ?: 'localhost');
-define('DB_PORT',    getenv('DB_PORT')       ?: getenv('MYSQLPORT')     ?: '3306');
-define('DB_NAME',    getenv('DB_DATABASE')   ?: getenv('MYSQLDATABASE') ?: 'SMPM');
-define('DB_USER',    getenv('DB_USERNAME')   ?: getenv('MYSQLUSER')     ?: 'root');
-define('DB_PASS',    getenv('DB_PASSWORD')   ?: getenv('MYSQLPASSWORD') ?: '');
+// Coba parse DATABASE_URL dulu (Railway inject ini)
+$databaseUrl = getenv('DATABASE_URL');
+
+if ($databaseUrl) {
+    $parts = parse_url($databaseUrl);
+    define('DB_HOST',    $parts['host']);
+    define('DB_PORT',    $parts['port'] ?? 3306);
+    define('DB_NAME',    ltrim($parts['path'], '/'));
+    define('DB_USER',    $parts['user']);
+    define('DB_PASS',    $parts['pass']);
+} else {
+    // Fallback lokal (Laragon)
+    define('DB_HOST',    getenv('MYSQLHOST')     ?: 'localhost');
+    define('DB_PORT',    getenv('MYSQLPORT')     ?: '3306');
+    define('DB_NAME',    getenv('MYSQLDATABASE') ?: 'SMPM');
+    define('DB_USER',    getenv('MYSQLUSER')     ?: 'root');
+    define('DB_PASS',    getenv('MYSQLPASSWORD') ?: '');
+}
+
 define('DB_CHARSET', 'utf8mb4');
 
 class Database {
