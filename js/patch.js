@@ -7,6 +7,15 @@
    ============================================= */
 
 /* ============================================================
+   BLOCK APP.JS SESSION BYPASS
+   Override checkSession() SEBELUM DOMContentLoaded app.js
+   jalan agar app.js tidak bisa baca sessionStorage dan
+   langsung masuk dashboard tanpa verifikasi server.
+   ============================================================ */
+sessionStorage.removeItem('smpm_user');
+window.checkSession = function() { return false; };
+
+/* ============================================================
    API HELPERS
    ============================================================ */
 function smpmPost(action, data) {
@@ -234,19 +243,30 @@ function smpmGoToLogin() {
 smpmPatchForms();
 
 (function smpmInit() {
-  var sess = window.__SMPM_SESSION__;
-  if (sess) {
-    currentUser = sess;
-    smpmLoadDB().then(function() {
-      buildSidebar();
-      showPage('dashboard');
-      smpmPatchNavItems();
+  // Selalu verifikasi ke server terlebih dahulu, jangan percaya
+  // window.__SMPM_SESSION__ mentah-mentah karena session PHP bisa
+  // masih tersimpan dari kunjungan sebelumnya.
+  smpmGet('check_session')
+    .then(function(res) {
+      if (res.ok && res.data) {
+        // Session valid di server
+        currentUser = res.data;
+        smpmLoadDB().then(function() {
+          buildSidebar();
+          showPage('dashboard');
+          smpmPatchNavItems();
+        });
+      } else {
+        // Tidak ada session valid — arahkan ke login
+        smpmGoToLogin();
+        smpmPatchRegisterPage();
+      }
+    })
+    .catch(function() {
+      // Gagal koneksi — arahkan ke login
+      smpmGoToLogin();
+      smpmPatchRegisterPage();
     });
-  } else {
-    // Tidak ada session — pastikan tampilan login bersih
-    smpmGoToLogin();
-    smpmPatchRegisterPage();
-  }
 })();
 
 /* ============================================================

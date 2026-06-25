@@ -15,15 +15,14 @@ require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/config/migrate.php';
 try { runMigrations(Database::getConnection()); } catch (Throwable $e) { error_log('migrate: '.$e->getMessage()); }
 
-$sessionUser = isset($_SESSION['user']) ? json_encode($_SESSION['user']) : 'null';
-
+// Serve index.html, patch.js akan memanggil api.php?action=check_session
+// untuk memverifikasi session ke server setiap kali halaman dibuka.
+// Dengan begitu user yang belum login selalu diarahkan ke halaman login.
 $html = file_get_contents(__DIR__ . '/index.html');
 
-// Inject window.__SMPM_SESSION__ + patch.js setelah app.js
-// patch.js mengganti DOMContentLoaded app.js agar pakai API
+// Sisipkan patch.js setelah app.js
 $html = str_replace(
     '<script src="js/app.js"></script>',
-    '<script>window.__SMPM_SESSION__ = ' . $sessionUser . ';</script>' . "\n" .
     '<script src="js/app.js"></script>' . "\n" .
     '<script src="js/patch.js"></script>',
     $html
