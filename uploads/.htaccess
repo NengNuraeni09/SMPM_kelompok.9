@@ -1,0 +1,8 @@
+# Larang eksekusi script di folder uploads
+<FilesMatch "\.(php|php3|php4|php5|phtml|pl|py|cgi|shtml)$">
+    Order Deny,Allow
+    Deny from all
+</FilesMatch>
+
+# Hanya izinkan file dokumen & gambar
+Options -Indexes
