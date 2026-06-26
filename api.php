@@ -190,23 +190,35 @@ switch ($action) {
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             'application/zip','image/png','image/jpeg'];
         $finfo = new finfo(FILEINFO_MIME_TYPE);
-        if (!in_array($finfo->file($file['tmp_name']), $allowed_mime, true))
+        $detectedMime = $finfo->file($file['tmp_name']);
+        if (!in_array($detectedMime, $allowed_mime, true))
             jsonErr('Tipe file tidak diizinkan.');
 
-        $dir = __DIR__ . '/uploads/';
-        if (!is_dir($dir)) mkdir($dir, 0755, true);
         $ext      = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
         $saveName = uniqid('f_', true) . '.' . $ext;
-        move_uploaded_file($file['tmp_name'], $dir . $saveName);
+
+        // Baca konten file untuk disimpan ke DB (tahan redeploy Railway)
+        $fileContent = file_get_contents($file['tmp_name']);
+        if ($fileContent === false) jsonErr('Gagal membaca file.');
+
+        // Coba simpan ke disk juga (kalau tersedia), tapi tidak wajib
+        $savedPath = 'uploads/' . $saveName;
+        $dir = __DIR__ . '/uploads/';
+        if (!is_dir($dir)) @mkdir($dir, 0755, true);
+        @move_uploaded_file($file['tmp_name'], $dir . $saveName);
 
         $ukuran = $file['size'] >= 1048576
             ? round($file['size']/1048576, 1) . ' MB'
             : round($file['size']/1024) . ' KB';
 
-        $ins = db()->prepare('INSERT INTO uploads (nama_file,path_file,ukuran,tipe,kelompok_id,user_id,tugas_id) VALUES (?,?,?,?,?,?,?)');
+        $ins = db()->prepare(
+            'INSERT INTO uploads (nama_file,path_file,file_data,ukuran,tipe,kelompok_id,user_id,tugas_id)
+             VALUES (?,?,?,?,?,?,?,?)'
+        );
         $ins->execute([
             htmlspecialchars($file['name'], ENT_QUOTES, 'UTF-8'),
-            'uploads/' . $saveName,
+            $savedPath,
+            $fileContent,
             $file['size'],
             strtoupper($ext),
             (int)$user['kelompok_id'],
@@ -216,9 +228,10 @@ switch ($action) {
         $newId = (int) db()->lastInsertId();
         db()->prepare('UPDATE tugas SET status=? WHERE id=?')->execute(['selesai',$tugasId]);
 
-        $row = db()->prepare('SELECT * FROM uploads WHERE id=?'); $row->execute([$newId]);
+        $row = db()->prepare('SELECT id,nama_file,path_file,ukuran,tipe,kelompok_id,user_id,tugas_id,uploaded_at FROM uploads WHERE id=?');
+        $row->execute([$newId]);
         $up = $row->fetch();
-        $up['ukuran'] = $ukuran; // human readable
+        $up['ukuran'] = $ukuran;
         jsonOk($up);
 
     case 'delete_upload':
@@ -244,7 +257,8 @@ switch ($action) {
         requireLogin();
         $id = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
         if (!$id) jsonErr('ID tidak valid.');
-        $row = db()->prepare('SELECT * FROM uploads WHERE id=? LIMIT 1'); $row->execute([$id]);
+        $row = db()->prepare('SELECT id,nama_file,path_file,file_data,ukuran,tipe,kelompok_id,user_id FROM uploads WHERE id=? LIMIT 1');
+        $row->execute([$id]);
         $up = $row->fetch();
         if (!$up) jsonErr('File tidak ditemukan.', 404);
 
@@ -253,11 +267,24 @@ switch ($action) {
         if ($user['role'] === 'mahasiswa' && (int)$up['kelompok_id'] !== (int)$user['kelompok_id'])
             jsonErr('Akses ditolak.', 403);
 
-        $filePath = __DIR__ . '/' . $up['path_file'];
-        if (!file_exists($filePath)) jsonErr('File tidak ditemukan di server.', 404);
+        // Tentukan konten file: prioritaskan dari DB, fallback ke disk
+        $fileContent = null;
+        if (!empty($up['file_data'])) {
+            $fileContent = $up['file_data'];
+        } else {
+            // Fallback: coba baca dari disk
+            $filePath = __DIR__ . '/' . $up['path_file'];
+            if (file_exists($filePath)) {
+                $fileContent = file_get_contents($filePath);
+            }
+        }
 
-        // Tentukan MIME type
-        $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+        if ($fileContent === null || $fileContent === false) {
+            jsonErr('File tidak tersedia. Upload ulang file ini.', 404);
+        }
+
+        // Tentukan MIME type dari ekstensi
+        $ext = strtolower(pathinfo($up['nama_file'], PATHINFO_EXTENSION));
         $mimes = [
             'pdf'  => 'application/pdf',
             'doc'  => 'application/msword',
@@ -269,19 +296,17 @@ switch ($action) {
         ];
         $mime = $mimes[$ext] ?? 'application/octet-stream';
 
-        // Paksa download jika pakai ?download=1, sebaliknya inline (bisa preview di browser)
         $disposition = isset($_GET['download']) ? 'attachment' : 'inline';
         $safeFileName = preg_replace('/[^a-zA-Z0-9._\- ]/', '_', $up['nama_file']);
 
+        // Hapus semua header sebelumnya (termasuk Content-Type: application/json)
+        header_remove();
         header('Content-Type: ' . $mime);
         header('Content-Disposition: ' . $disposition . '; filename="' . $safeFileName . '"');
-        header('Content-Length: ' . filesize($filePath));
+        header('Content-Length: ' . strlen($fileContent));
         header('Cache-Control: private, max-age=3600');
         header('X-Content-Type-Options: nosniff');
-        // Hapus header JSON yang mungkin sudah di-set
-        header_remove('Content-Type');
-        header('Content-Type: ' . $mime);
-        readfile($filePath);
+        echo $fileContent;
         exit;
 
     /* ---------- PENILAIAN ---------- */

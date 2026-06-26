@@ -6,7 +6,17 @@
    ============================================= */
 
 function runMigrations(PDO $pdo): void {
-    // Cek apakah tabel 'users' sudah ada — kalau sudah, skip semua
+    // Selalu cek dan tambah kolom file_data jika belum ada
+    // (untuk DB yang sudah berjalan tanpa kolom ini)
+    try {
+        $pdo->query('SELECT file_data FROM uploads LIMIT 1');
+    } catch (PDOException $e) {
+        try {
+            $pdo->exec('ALTER TABLE uploads ADD COLUMN file_data LONGBLOB DEFAULT NULL AFTER path_file');
+        } catch (PDOException $e2) { /* tabel belum ada, akan dibuat di bawah */ }
+    }
+
+    // Cek apakah tabel 'users' sudah ada — kalau sudah, skip create tables
     try {
         $pdo->query('SELECT 1 FROM users LIMIT 1');
         return; // Sudah ada, tidak perlu migrate
@@ -61,6 +71,7 @@ function runMigrations(PDO $pdo): void {
         id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
         nama_file   VARCHAR(255)  NOT NULL,
         path_file   VARCHAR(500)  NOT NULL,
+        file_data   LONGBLOB      DEFAULT NULL,
         ukuran      INT UNSIGNED  NOT NULL,
         tipe        VARCHAR(20)   DEFAULT NULL,
         kelompok_id INT UNSIGNED  NOT NULL,
