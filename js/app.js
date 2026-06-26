@@ -515,9 +515,22 @@ function submitKumpulkan(tugasId) {
 }
 
 function hapusUploadTugas(uploadId, tugasId) {
-  const idx = DB.uploads.findIndex(u => u.id === uploadId);
-  if (idx > -1) DB.uploads.splice(idx, 1);
-  showKumpulkanModal(tugasId);
+  const apiBase = (typeof _smpmBase !== 'undefined' ? _smpmBase : '');
+  const fd = new FormData();
+  fd.append('id', uploadId);
+
+  fetch(apiBase + 'api.php?action=delete_upload', { method: 'POST', body: fd, credentials: 'include' })
+    .then(r => r.json())
+    .then(json => {
+      if (!json.ok) throw new Error(json.message || 'Gagal menghapus');
+    })
+    .catch(() => { /* fallback silent */ })
+    .finally(() => {
+      // Tetap hapus dari lokal agar UI responsif
+      const idx = DB.uploads.findIndex(u => u.id === uploadId);
+      if (idx > -1) DB.uploads.splice(idx, 1);
+      showKumpulkanModal(tugasId);
+    });
 }
 
 function selesaikanTugas(id) {
@@ -993,10 +1006,9 @@ function hapusUpload(uploadId) {
 }
 
 function konfirmasiHapusUpload(uploadId) {
+  // Dioverride oleh patch.js — fallback lokal kalau patch.js tidak tersedia
   const index = DB.uploads.findIndex(u => u.id === uploadId);
-  if (index > -1) {
-    DB.uploads.splice(index, 1);
-  }
+  if (index > -1) DB.uploads.splice(index, 1);
   closeModal();
   renderUpload();
   showToast('File berhasil dihapus!', 'success');
@@ -1318,70 +1330,180 @@ function confirmHapusTugas(tugasId, kelompokId) {
 }
 
 /* ---- MONITORING (Dosen) ---- */
+let monitoringFilter = { kelompok: '', status: '' };
+
 function renderMonitoring() {
   if (!currentUser || currentUser.role !== 'dosen') return;
   const container = document.getElementById('monitoring-list');
   if (!container) return;
-  const recentUploads = DB.uploads.slice(-3).reverse();
+
+  const allUploads   = DB.uploads.slice().reverse();
+  const recentUploads = allUploads.slice(0, 5);
+  const totalTugas   = DB.tugas.length;
+  const tugasSelesai = DB.tugas.filter(t => t.status === 'selesai').length;
+  const tugasTerlambat = DB.tugas.filter(t => t.status === 'terlambat').length;
+
+  // Filtered kelompok list
+  let kelompokList = DB.kelompok;
+  if (monitoringFilter.kelompok) kelompokList = kelompokList.filter(k => k.id == monitoringFilter.kelompok);
+  if (monitoringFilter.status === 'on-track') kelompokList = kelompokList.filter(k => k.progress >= 50);
+  if (monitoringFilter.status === 'perhatian') kelompokList = kelompokList.filter(k => k.progress < 50);
+
   container.innerHTML = `
-    <div class="mb-16" style="display:flex;gap:12px;justify-content:flex-end">
-      <button class="btn btn-primary" onclick="exportMonitoringAsPDF()" style="display:flex;align-items:center;gap:8px">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 9H5a2 2 0 00-2 2v6a2 2 0 002 2h14a2 2 0 002-2v-6a2 2 0 00-2-2zm-5 6H7m5 0v3m0-3H9m5-2v-2"/></svg>
-        Export PDF
-      </button>
+    <!-- Export + Filter Toolbar -->
+    <div class="card mb-16">
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end">
+        <div class="form-group" style="flex:1;min-width:160px;margin:0">
+          <label class="form-label" style="font-size:.75rem">Filter Kelompok</label>
+          <select class="form-control" onchange="monitoringFilter.kelompok=this.value;renderMonitoring()">
+            <option value="">Semua Kelompok</option>
+            ${DB.kelompok.map(k => `<option value="${k.id}" ${monitoringFilter.kelompok==k.id?'selected':''}>${k.nama}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group" style="flex:1;min-width:140px;margin:0">
+          <label class="form-label" style="font-size:.75rem">Filter Status</label>
+          <select class="form-control" onchange="monitoringFilter.status=this.value;renderMonitoring()">
+            <option value="">Semua Status</option>
+            <option value="on-track" ${monitoringFilter.status==='on-track'?'selected':''}>On Track (&ge;50%)</option>
+            <option value="perhatian" ${monitoringFilter.status==='perhatian'?'selected':''}>Perlu Perhatian (&lt;50%)</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:flex-end;gap:8px">
+          <button class="btn btn-outline" onclick="monitoringFilter={kelompok:'',status:''};renderMonitoring()" style="font-size:.8rem">&#x2715; Reset</button>
+          <button class="btn btn-primary" onclick="exportMonitoringAsPDF()" style="display:flex;align-items:center;gap:8px;font-size:.8rem">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 9H5a2 2 0 00-2 2v6a2 2 0 002 2h14a2 2 0 002-2v-6a2 2 0 00-2-2zm-5 6H7m5 0v3m0-3H9m5-2v-2"/></svg>
+            Export PDF
+          </button>
+        </div>
+      </div>
     </div>
+
+    <!-- Stat Cards -->
     <div class="stat-grid mb-24">
       <div class="stat-card"><div class="stat-label">Total Kelompok</div><div class="stat-value">${DB.kelompok.length}</div></div>
-      <div class="stat-card"><div class="stat-label">On Track (>=50%)</div><div class="stat-value" style="color:var(--success)">${DB.kelompok.filter(k=>k.progress>=50).length}</div></div>
+      <div class="stat-card"><div class="stat-label">On Track (&ge;50%)</div><div class="stat-value" style="color:var(--success)">${DB.kelompok.filter(k=>k.progress>=50).length}</div></div>
       <div class="stat-card"><div class="stat-label">Perlu Perhatian</div><div class="stat-value" style="color:var(--danger)">${DB.kelompok.filter(k=>k.progress<50).length}</div></div>
-      <div class="stat-card"><div class="stat-label">Total Upload</div><div class="stat-value">${DB.uploads.length}</div></div>
+      <div class="stat-card"><div class="stat-label">Tugas Selesai</div><div class="stat-value" style="color:var(--accent)">${tugasSelesai}/${totalTugas}</div></div>
     </div>
+
+    <!-- Progress Kelompok -->
     <div class="card mb-16">
-      <div class="card-title">Progress Semua Kelompok</div>
+      <div class="flex justify-between items-center mb-16" style="flex-wrap:wrap;gap:8px">
+        <div class="card-title" style="margin:0">Progress Kelompok ${kelompokList.length < DB.kelompok.length ? `(${kelompokList.length} dari ${DB.kelompok.length})` : ''}</div>
+      </div>
+      ${kelompokList.length === 0
+        ? '<div style="text-align:center;padding:24px;color:var(--text-3)">Tidak ada kelompok yang sesuai filter.</div>'
+        : `<div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>Kelompok</th><th>Tema</th><th>Tugas</th><th>Progress</th><th>Status</th><th>Aksi</th></tr></thead>
+              <tbody>${kelompokList.map(k => {
+                const tugasK = DB.tugas.filter(t => t.kelompok_id === k.id);
+                const selesaiK = tugasK.filter(t => t.status === 'selesai').length;
+                const terlambatK = tugasK.filter(t => t.status === 'terlambat').length;
+                return `
+                <tr>
+                  <td><strong>${k.nama}</strong></td>
+                  <td class="text-sm text-muted">${k.tema}</td>
+                  <td style="text-align:center">
+                    <span class="font-600" style="color:var(--success)">${selesaiK}</span><span class="text-muted">/${tugasK.length}</span>
+                    ${terlambatK > 0 ? `<br><span style="font-size:.72rem;color:var(--danger)">${terlambatK} terlambat</span>` : ''}
+                  </td>
+                  <td style="min-width:180px">
+                    <div class="flex items-center gap-8">
+                      <div class="progress-wrap" style="flex:1"><div class="progress-fill ${progressColor(k.progress)}" style="width:${k.progress}%"></div></div>
+                      <span class="text-sm font-600">${k.progress}%</span>
+                    </div>
+                  </td>
+                  <td>${progressBadge(k.progress)}</td>
+                  <td><button class="btn btn-sm btn-outline" onclick="showDetailKelompok(${k.id})">Detail</button></td>
+                </tr>`}).join('')}
+              </tbody>
+            </table>
+          </div>`
+      }
+    </div>
+
+    <!-- Progress per Anggota -->
+    <div class="card mb-16">
+      <div class="card-title">Aktivitas per Anggota</div>
       <div class="table-wrap">
         <table class="data-table">
-          <thead><tr><th>Kelompok</th><th>Tema</th><th>Progress</th><th>Status</th><th>Aksi</th></tr></thead>
-          <tbody>${DB.kelompok.map(k => `
-            <tr>
-              <td><strong>${k.nama}</strong></td>
-              <td class="text-sm text-muted">${k.tema}</td>
-              <td style="min-width:180px">
-                <div class="flex items-center gap-8">
-                  <div class="progress-wrap" style="flex:1"><div class="progress-fill ${progressColor(k.progress)}" style="width:${k.progress}%"></div></div>
-                  <span class="text-sm font-600">${k.progress}%</span>
-                </div>
-              </td>
-              <td>${progressBadge(k.progress)}</td>
-              <td><button class="btn btn-sm btn-outline" onclick="showDetailKelompok(${k.id})">Detail</button></td>
-            </tr>`).join('')}
+          <thead>
+            <tr><th>Mahasiswa</th><th>Kelompok</th><th>Tugas Selesai</th><th>File Upload</th><th>Terlambat</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            ${DB.users.filter(u => u.role === 'mahasiswa' && (!monitoringFilter.kelompok || u.kelompok_id == monitoringFilter.kelompok)).map(u => {
+              const tugasU = DB.tugas.filter(t => t.kelompok_id === u.kelompok_id && t.assignee === u.id);
+              const selesaiU = tugasU.filter(t => t.status === 'selesai').length;
+              const terlambatU = tugasU.filter(t => t.status === 'terlambat').length;
+              const uploadsU = DB.uploads.filter(up => up.user_id === u.id);
+              const kelompok = DB.kelompok.find(k => k.id === u.kelompok_id);
+              const isAktif = selesaiU === tugasU.length && tugasU.length > 0;
+              return `
+              <tr>
+                <td>
+                  <div class="flex items-center gap-8">
+                    <div class="avatar" style="width:30px;height:30px;font-size:.65rem">${u.avatar}</div>
+                    <div>
+                      <div class="font-600" style="font-size:.85rem">${u.nama}</div>
+                      <div class="text-xs text-muted">${u.nim}</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="text-sm">${kelompok ? `<span class="badge badge-navy" style="font-size:.72rem">${kelompok.nama}</span>` : '<span class="text-muted">-</span>'}</td>
+                <td style="text-align:center">
+                  <span class="font-600" style="color:${selesaiU===tugasU.length&&tugasU.length>0?'var(--success)':'var(--text-1)'}">${selesaiU}</span>
+                  <span class="text-muted">/${tugasU.length}</span>
+                </td>
+                <td style="text-align:center"><span class="font-600">${uploadsU.length}</span></td>
+                <td style="text-align:center">
+                  ${terlambatU > 0
+                    ? `<span class="badge badge-red" style="font-size:.72rem">${terlambatU}</span>`
+                    : '<span class="text-muted text-sm">-</span>'}
+                </td>
+                <td>
+                  ${tugasU.length === 0
+                    ? '<span class="badge badge-amber" style="font-size:.72rem">Belum ada tugas</span>'
+                    : isAktif
+                      ? '<span class="badge badge-green" style="font-size:.72rem">Selesai</span>'
+                      : terlambatU > 0
+                        ? '<span class="badge badge-red" style="font-size:.72rem">Perlu Perhatian</span>'
+                        : '<span class="badge badge-blue" style="font-size:.72rem">On Progress</span>'}
+                </td>
+              </tr>`;
+            }).join('')}
           </tbody>
         </table>
       </div>
     </div>
+
+    <!-- Upload Terbaru -->
     <div class="card">
-      <div class="card-title">Upload Terbaru</div>
-      ${recentUploads.map(u => {
-        const user = DB.users.find(x => x.id === u.user_id);
-        const kelompok = DB.kelompok.find(k => k.id === u.kelompok_id);
-        return `
-          <div class="flex justify-between items-center mb-8 pb-8" style="border-bottom:1px solid var(--border);cursor:pointer"
-            onclick="lihatFileTugas(${u.id})" title="Klik untuk buka file"
-            onmouseover="this.style.background='var(--surface)'" onmouseout="this.style.background='transparent'">
-            <div class="flex items-center gap-10">
-              <div style="width:32px;height:32px;background:var(--accent-lt);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;color:var(--accent);flex-shrink:0">${u.tipe}</div>
-              <div>
-                <div class="font-600">${u.nama_file}</div>
-                <div class="text-sm text-muted">${kelompok?.nama} &middot; ${user?.nama}</div>
+      <div class="card-title">Upload Terbaru (5 terakhir)</div>
+      ${recentUploads.length === 0
+        ? '<div style="text-align:center;padding:24px;color:var(--text-3)">Belum ada file diupload.</div>'
+        : recentUploads.map(u => {
+          const user = DB.users.find(x => x.id === u.user_id);
+          const kelompok = DB.kelompok.find(k => k.id === u.kelompok_id);
+          return `
+            <div class="flex justify-between items-center mb-8 pb-8" style="border-bottom:1px solid var(--border);cursor:pointer"
+              onclick="lihatFileTugas(${u.id})" title="Klik untuk buka file"
+              onmouseover="this.style.background='var(--surface)'" onmouseout="this.style.background='transparent'">
+              <div class="flex items-center gap-10">
+                <div style="width:32px;height:32px;background:var(--accent-lt);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;color:var(--accent);flex-shrink:0">${u.tipe}</div>
+                <div>
+                  <div class="font-600">${u.nama_file}</div>
+                  <div class="text-sm text-muted">${kelompok?.nama || '-'} &middot; ${user?.nama || '-'}</div>
+                </div>
               </div>
-            </div>
-            <div style="display:flex;align-items:center;gap:8px">
-              <span class="text-sm text-muted">${u.tanggal}</span>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-              </svg>
-            </div>
-          </div>`;
-      }).join('')}
+              <div style="display:flex;align-items:center;gap:8px">
+                <span class="text-sm text-muted">${u.tanggal}</span>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+                </svg>
+              </div>
+            </div>`;
+        }).join('')}
     </div>
   `;
 }
@@ -1635,7 +1757,7 @@ function showDetailPenilaian(kelompokId) {
       
       <!-- Anggota Kelompok -->
       <div class="card" style="background:var(--surface)">
-        <div class="card-title" style="margin-bottom:12px">æÑ Anggota Kelompok (${anggota.length})</div>
+        <div class="card-title" style="margin-bottom:12px">&#128101; Anggota Kelompok (${anggota.length})</div>
         ${anggota.length === 0 ? '<div class="text-sm text-muted" style="text-align:center;padding:16px">Tidak ada anggota</div>' : `
           <div style="display:grid;gap:8px">
             ${anggota.map(a => {
@@ -2484,7 +2606,7 @@ function showDetailKelompokAdmin(kelompokId) {
       <div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
           <div style="font-size:.82rem;font-weight:700;color:var(--text-2)">
-            æÑ Anggota
+            &#128101; Anggota
             <span style="font-weight:400;color:${anggota.length>=MAX?'var(--danger)':'var(--text-3)'}">
               (${anggota.length}/${MAX})
             </span>
@@ -3081,18 +3203,46 @@ function exportMonitoringAsPDF() {
   let html = '<h2>Laporan Monitoring Kelompok</h2>';
   html += '<p>Tanggal: ' + new Date().toLocaleDateString('id-ID') + '</p>';
   html += '<p>Dosen: ' + currentUser.nama + '</p>';
-  html += '<table border="1" cellpadding="10" style="width:100%; border-collapse:collapse;">';
-  html += '<thead><tr style="background:#0B1F3A; color:white;"><th>No</th><th>Kelompok</th><th>Tema</th><th>Progress</th><th>Status</th></tr></thead><tbody>';
-  
+  html += '<br>';
+
+  // Tabel kelompok
+  html += '<h3>Progress Kelompok</h3>';
+  html += '<table border="1" cellpadding="8" style="width:100%;border-collapse:collapse;margin-bottom:20px">';
+  html += '<thead><tr style="background:#0B1F3A;color:white"><th>No</th><th>Kelompok</th><th>Tema</th><th>Tugas Selesai</th><th>Progress</th><th>Status</th></tr></thead><tbody>';
   DB.kelompok.forEach((k, idx) => {
-    if (k.dosen_id === currentUser.id) {
-      html += '<tr><td>' + (idx + 1) + '</td><td>' + k.nama + '</td><td>' + k.tema + '</td>';
-      html += '<td>' + k.progress + '%</td>';
-      html += '<td style="background:#16A34A; color:white;">' + (k.status.charAt(0).toUpperCase() + k.status.slice(1)) + '</td></tr>';
-    }
+    const tugasK = DB.tugas.filter(t => t.kelompok_id === k.id);
+    const selesaiK = tugasK.filter(t => t.status === 'selesai').length;
+    const statusColor = k.progress >= 50 ? '#16A34A' : '#DC2626';
+    html += '<tr>';
+    html += '<td>' + (idx + 1) + '</td><td><strong>' + k.nama + '</strong></td><td>' + k.tema + '</td>';
+    html += '<td style="text-align:center">' + selesaiK + '/' + tugasK.length + '</td>';
+    html += '<td style="text-align:center">' + k.progress + '%</td>';
+    html += '<td style="background:' + statusColor + ';color:white;text-align:center">' + (k.progress >= 50 ? 'On Track' : 'Perlu Perhatian') + '</td>';
+    html += '</tr>';
   });
-  
   html += '</tbody></table>';
+
+  // Tabel aktivitas mahasiswa
+  html += '<h3>Aktivitas per Mahasiswa</h3>';
+  html += '<table border="1" cellpadding="8" style="width:100%;border-collapse:collapse">';
+  html += '<thead><tr style="background:#0B1F3A;color:white"><th>No</th><th>Nama</th><th>NIM</th><th>Kelompok</th><th>Tugas Selesai</th><th>Upload</th><th>Terlambat</th></tr></thead><tbody>';
+  const mahasiswaList = DB.users.filter(u => u.role === 'mahasiswa');
+  mahasiswaList.forEach((u, idx) => {
+    const tugasU = DB.tugas.filter(t => t.kelompok_id === u.kelompok_id && t.assignee === u.id);
+    const selesaiU = tugasU.filter(t => t.status === 'selesai').length;
+    const terlambatU = tugasU.filter(t => t.status === 'terlambat').length;
+    const uploadsU = DB.uploads.filter(up => up.user_id === u.id).length;
+    const kelompok = DB.kelompok.find(k => k.id === u.kelompok_id);
+    html += '<tr>';
+    html += '<td>' + (idx + 1) + '</td><td>' + u.nama + '</td><td>' + u.nim + '</td>';
+    html += '<td>' + (kelompok ? kelompok.nama : '-') + '</td>';
+    html += '<td style="text-align:center">' + selesaiU + '/' + tugasU.length + '</td>';
+    html += '<td style="text-align:center">' + uploadsU + '</td>';
+    html += '<td style="text-align:center;color:' + (terlambatU > 0 ? '#DC2626' : '#16A34A') + '">' + (terlambatU > 0 ? terlambatU : '-') + '</td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+
   downloadPDF('Laporan_Monitoring_' + new Date().getTime() + '.pdf', html);
 }
 
@@ -3392,7 +3542,7 @@ function handleForgotPassword() {
       <div class="form-group">
         <label class="form-label">Password Baru <span style="color:var(--danger)">*</span></label>
         <input class="form-control" id="reset-password" type="password" placeholder="Minimal 6 karakter" />
-        <div class="text-xs text-muted" style="margin-top:4px">Æí Minimal 6 karakter untuk mahasiswa</div>
+        <div class="text-xs text-muted" style="margin-top:4px">&#9432; Minimal 6 karakter untuk mahasiswa</div>
       </div>
       
       <div class="form-group">
