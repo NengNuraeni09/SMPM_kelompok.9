@@ -6,21 +6,40 @@
    ============================================= */
 declare(strict_types=1);
 
+// Tangkap semua fatal error agar selalu kembalikan JSON, bukan HTML
+set_exception_handler(function(Throwable $e) {
+    if (!headers_sent()) {
+        header('Content-Type: application/json; charset=utf-8');
+    }
+    http_response_code(500);
+    echo json_encode(['ok' => false, 'message' => 'Server error: ' . $e->getMessage()]);
+    exit;
+});
+
+// Matikan output error PHP ke browser agar tidak corrupt JSON
+@ini_set('display_errors', '0');
+@ini_set('log_errors', '1');
+
 $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
         || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https'
         || ($_SERVER['SERVER_PORT'] ?? 80) == 443;
 
+// SameSite=None+Secure untuk HTTPS (Railway), Lax untuk lokal HTTP
+// Ini penting agar cookie ikut di semua browser mobile
 session_set_cookie_params([
     'lifetime' => 0,
     'path'     => '/',
     'secure'   => $isHttps,
     'httponly' => true,
-    'samesite' => 'Lax',
+    'samesite' => $isHttps ? 'None' : 'Lax',
 ]);
 session_start();
 
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
+// Cache control agar browser mobile tidak pakai respon lama
+header('Cache-Control: no-store, no-cache, must-revalidate');
+header('Pragma: no-cache');
 
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/config/migrate.php';

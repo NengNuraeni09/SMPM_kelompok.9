@@ -39,24 +39,36 @@ var _smpmBase = (function() {
 })();
 
 function smpmFetch(url, opts, retries) {
-  retries = retries === undefined ? 2 : retries;
-  var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-  var timer = controller ? setTimeout(function() { controller.abort(); }, 20000) : null;
-  if (controller && opts) opts.signal = controller.signal;
-  return fetch(url, opts || {})
-    .then(function(r) {
-      if (timer) clearTimeout(timer);
-      return r;
-    })
-    .catch(function(err) {
-      if (timer) clearTimeout(timer);
-      if (retries > 0) {
-        // Tunggu 1.5 detik lalu retry
-        return new Promise(function(resolve) { setTimeout(resolve, 1500); })
-          .then(function() { return smpmFetch(url, opts, retries - 1); });
-      }
-      throw err;
-    });
+  retries = retries === undefined ? 3 : retries;
+  // Buat fresh opts tiap call agar signal tidak expired saat retry
+  var fetchOpts = Object.assign({ credentials: 'include' }, opts || {});
+  // Hapus signal lama (akan dibuat baru tiap attempt)
+  delete fetchOpts.signal;
+
+  function attempt(n) {
+    var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    var timer = controller ? setTimeout(function() { controller.abort(); }, 60000) : null;
+    var attemptOpts = Object.assign({}, fetchOpts);
+    if (controller) attemptOpts.signal = controller.signal;
+
+    return fetch(url, attemptOpts)
+      .then(function(r) {
+        if (timer) clearTimeout(timer);
+        return r;
+      })
+      .catch(function(err) {
+        if (timer) clearTimeout(timer);
+        // AbortError = timeout, jangan retry kalau file upload (POST with body)
+        var isUpload = fetchOpts.body instanceof FormData;
+        if (n > 0 && !(err.name === 'AbortError' && isUpload)) {
+          var delay = 1500 * (4 - n); // 1.5s, 3s, 4.5s
+          return new Promise(function(resolve) { setTimeout(resolve, delay); })
+            .then(function() { return attempt(n - 1); });
+        }
+        throw err;
+      });
+  }
+  return attempt(retries);
 }
 
 function smpmPost(action, data) {
@@ -69,12 +81,28 @@ function smpmPost(action, data) {
   }
   return smpmFetch(_smpmBase + 'api.php?action=' + encodeURIComponent(action), {
     method: 'POST', body: fd
-  }).then(function(r) { return r.json(); });
+  }).then(function(r) {
+    var ct = r.headers.get('Content-Type') || '';
+    if (ct.indexOf('application/json') === -1) {
+      return r.text().then(function(txt) {
+        throw new Error('Server error (' + r.status + '): ' + txt.substring(0, 200));
+      });
+    }
+    return r.json();
+  });
 }
 
 function smpmGet(action) {
   return smpmFetch(_smpmBase + 'api.php?action=' + encodeURIComponent(action))
-    .then(function(r) { return r.json(); });
+    .then(function(r) {
+      var ct = r.headers.get('Content-Type') || '';
+      if (ct.indexOf('application/json') === -1) {
+        return r.text().then(function(txt) {
+          throw new Error('Server error (' + r.status + '): ' + txt.substring(0, 200));
+        });
+      }
+      return r.json();
+    });
 }
 
 function smpmFmtBytes(b) {
@@ -109,6 +137,10 @@ function smpmLoadDB() {
     (d.penilaian || []).forEach(function(p) {
       DB.penilaian.push(Object.assign({}, p, { id: +p.id, kelompok_id: +p.kelompok_id, dosen_id: +p.dosen_id, nilai: p.nilai != null ? +p.nilai : null, tanggal: p.dinilai_at || null }));
     });
+  }).catch(function(err) {
+    // Jangan biarkan loadDB error mematikan seluruh UI
+    // Data lokal tetap terpakai
+    console.warn('smpmLoadDB failed:', err && err.message);
   });
 }
 
@@ -295,9 +327,6 @@ function smpmGoToLogin() {
 smpmPatchForms();
 
 (function smpmInit() {
-  // Tampilkan loading state agar user tahu sedang proses
-  // (Railway cold start bisa 10-30 detik)
-  var loginPage = document.getElementById('page-login');
   var loadingEl = document.createElement('div');
   loadingEl.id = 'smpm-loading';
   loadingEl.style.cssText = 'position:fixed;inset:0;background:var(--navy);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;gap:16px';
@@ -311,6 +340,18 @@ smpmPatchForms();
   function hideLoading() {
     var el = document.getElementById('smpm-loading');
     if (el) el.remove();
+  }
+
+  function showRetry(msg) {
+    var el = document.getElementById('smpm-loading');
+    if (el) {
+      el.innerHTML = '<div style="text-align:center;padding:24px;max-width:320px">'
+        + '<div style="font-size:2rem;margin-bottom:12px">⚠️</div>'
+        + '<div style="color:#fff;font-weight:600;margin-bottom:8px">Gagal terhubung ke server</div>'
+        + '<div style="color:rgba(255,255,255,.6);font-size:.82rem;margin-bottom:20px">' + (msg || 'Periksa koneksi internet Anda.') + '</div>'
+        + '<button onclick="window.location.reload()" style="background:#2F80ED;color:#fff;border:none;padding:10px 28px;border-radius:8px;font-size:.9rem;cursor:pointer;font-weight:600">🔄 Coba Lagi</button>'
+        + '</div>';
+    }
   }
 
   smpmGet('check_session')
@@ -328,11 +369,22 @@ smpmPatchForms();
         smpmPatchRegisterPage();
       }
     })
-    .catch(function() {
-      hideLoading();
-      smpmGoToLogin();
-      smpmPatchRegisterPage();
-      showToast('Server lambat merespons. Coba refresh halaman.', 'error');
+    .catch(function(err) {
+      var msg = (err && err.message) ? err.message : '';
+      // Kalau error DB (bukan network), tampilkan pesan spesifik
+      var isDbErr = msg.indexOf('database') !== -1 || msg.indexOf('SQLSTATE') !== -1 || msg.indexOf('PDO') !== -1;
+      var isNet   = msg.indexOf('fetch') !== -1 || msg === '' || msg.indexOf('Failed') !== -1 || msg.indexOf('NetworkError') !== -1;
+      if (isDbErr) {
+        showRetry('Database sedang tidak tersedia. Coba beberapa saat lagi.');
+      } else if (isNet) {
+        showRetry('Tidak dapat terhubung ke server. Periksa koneksi internet Anda.');
+      } else {
+        // Server mungkin tetap jalan, coba tampilkan halaman login
+        hideLoading();
+        smpmGoToLogin();
+        smpmPatchRegisterPage();
+        showToast('Server lambat merespons. Jika ada masalah, refresh halaman.', 'error');
+      }
     });
 })();
 
@@ -382,10 +434,26 @@ function smpmHandleRegister() {
       if (loginPass)  loginPass.value  = '';
       showToast('✅ Akun berhasil dibuat! Silakan masuk dengan akun Anda.', 'success');
     })
-    .catch(function() {
+    .catch(function(err) {
       if (btn) { btn.disabled = false; btn.textContent = 'Daftar Sekarang'; }
-      showErr('Koneksi gagal. Coba lagi.');
+      showErr('Koneksi gagal. Periksa internet Anda, lalu coba lagi.');
     });
+}
+
+/* ============================================================
+   ERROR HELPER
+   ============================================================ */
+function smpmHandleError(err, fallbackMsg) {
+  var msg = (err && err.message) ? err.message : '';
+  if (!msg || msg.indexOf('Failed to fetch') !== -1 || msg.indexOf('NetworkError') !== -1 || msg.indexOf('Load failed') !== -1) {
+    showToast('Tidak dapat terhubung. Periksa koneksi internet Anda, lalu coba lagi.', 'error');
+  } else if (msg.indexOf('AbortError') !== -1 || (err && err.name === 'AbortError')) {
+    showToast('Request timeout. Koneksi lambat — coba lagi.', 'error');
+  } else if (msg.indexOf('Server error') !== -1) {
+    showToast('Server mengalami masalah. Coba refresh halaman.', 'error');
+  } else {
+    showToast(fallbackMsg || msg || 'Terjadi kesalahan. Coba lagi.', 'error');
+  }
 }
 
 /* ============================================================
@@ -410,7 +478,8 @@ function submitAddUser() {
       if (btn) { btn.disabled = false; btn.textContent = 'Simpan User'; }
       if (!res.ok) { showToast(res.message || 'Gagal menambah user.', 'error'); return; }
       smpmLoadDB().then(function() { closeModal(); renderManageUser(); showToast('User berhasil ditambahkan!', 'success'); });
-    });
+    })
+    .catch(function(err) { if (btn) { btn.disabled = false; btn.textContent = 'Simpan User'; } smpmHandleError(err); });
 }
 
 function submitEditUser(userId) {
@@ -426,20 +495,24 @@ function submitEditUser(userId) {
   if (pass) payload.password = pass;
   var btn = document.querySelector('#modal-body .btn-primary');
   if (btn) { btn.disabled = true; btn.textContent = 'Menyimpan...'; }
-  smpmPost('update_user', payload).then(function(res) {
-    if (btn) { btn.disabled = false; btn.textContent = 'Simpan Perubahan'; }
-    if (!res.ok) { showToast(res.message || 'Gagal update user.', 'error'); return; }
-    if (+userId === +currentUser.id) { currentUser = Object.assign({}, currentUser, res.data); buildSidebar(); }
-    smpmLoadDB().then(function() { closeModal(); renderManageUser(); showToast('User berhasil diperbarui!', 'success'); });
-  });
+  smpmPost('update_user', payload)
+    .then(function(res) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Simpan Perubahan'; }
+      if (!res.ok) { showToast(res.message || 'Gagal update user.', 'error'); return; }
+      if (+userId === +currentUser.id) { currentUser = Object.assign({}, currentUser, res.data); buildSidebar(); }
+      smpmLoadDB().then(function() { closeModal(); renderManageUser(); showToast('User berhasil diperbarui!', 'success'); });
+    })
+    .catch(function(err) { if (btn) { btn.disabled = false; btn.textContent = 'Simpan Perubahan'; } smpmHandleError(err); });
 }
 
 function deleteUser(id) {
   if (+id === +currentUser.id) { showToast('Tidak bisa hapus akun sendiri', 'error'); return; }
-  smpmPost('delete_user', { id: id }).then(function(res) {
-    if (!res.ok) { showToast(res.message || 'Gagal hapus user.', 'error'); return; }
-    smpmLoadDB().then(function() { closeModal(); renderManageUser(); showToast('User berhasil dihapus!', 'success'); });
-  });
+  smpmPost('delete_user', { id: id })
+    .then(function(res) {
+      if (!res.ok) { showToast(res.message || 'Gagal hapus user.', 'error'); return; }
+      smpmLoadDB().then(function() { closeModal(); renderManageUser(); showToast('User berhasil dihapus!', 'success'); });
+    })
+    .catch(function(err) { smpmHandleError(err); });
 }
 
 /* KELOMPOK */
@@ -454,11 +527,13 @@ function simpanKelompokBaru() {
   }
   var btn = document.querySelector('#modal-body .btn-primary');
   if (btn) { btn.disabled = true; btn.textContent = 'Menyimpan...'; }
-  smpmPost('add_kelompok', { nama: nama, tema: tema, dosen_id: dosenId, status: 'aktif' }).then(function(res) {
-    if (btn) { btn.disabled = false; btn.textContent = 'Simpan'; }
-    if (!res.ok) { showToast(res.message || 'Gagal tambah kelompok.', 'error'); return; }
-    smpmLoadDB().then(function() { closeModal(); renderManageKelompok(); showToast('Kelompok "' + nama + '" berhasil ditambahkan!', 'success'); });
-  });
+  smpmPost('add_kelompok', { nama: nama, tema: tema, dosen_id: dosenId, status: 'aktif' })
+    .then(function(res) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Simpan'; }
+      if (!res.ok) { showToast(res.message || 'Gagal tambah kelompok.', 'error'); return; }
+      smpmLoadDB().then(function() { closeModal(); renderManageKelompok(); showToast('Kelompok "' + nama + '" berhasil ditambahkan!', 'success'); });
+    })
+    .catch(function(err) { if (btn) { btn.disabled = false; btn.textContent = 'Simpan'; } smpmHandleError(err); });
 }
 
 function updateKelompok(kelompokId) {
@@ -471,18 +546,22 @@ function updateKelompok(kelompokId) {
   if (!tema) { showToast('Tema proyek wajib!', 'error'); return; }
   var btn = document.querySelector('#modal-body .btn-primary');
   if (btn) { btn.disabled = true; btn.textContent = 'Menyimpan...'; }
-  smpmPost('update_kelompok', { id: kelompokId, nama: nama, tema: tema, dosen_id: dosenId, progress: progress, status: status }).then(function(res) {
-    if (btn) { btn.disabled = false; btn.textContent = 'Simpan Perubahan'; }
-    if (!res.ok) { showToast(res.message || 'Gagal update kelompok.', 'error'); return; }
-    smpmLoadDB().then(function() { closeModal(); renderManageKelompok(); showToast('Kelompok berhasil diperbarui!', 'success'); });
-  });
+  smpmPost('update_kelompok', { id: kelompokId, nama: nama, tema: tema, dosen_id: dosenId, progress: progress, status: status })
+    .then(function(res) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Simpan Perubahan'; }
+      if (!res.ok) { showToast(res.message || 'Gagal update kelompok.', 'error'); return; }
+      smpmLoadDB().then(function() { closeModal(); renderManageKelompok(); showToast('Kelompok berhasil diperbarui!', 'success'); });
+    })
+    .catch(function(err) { if (btn) { btn.disabled = false; btn.textContent = 'Simpan Perubahan'; } smpmHandleError(err); });
 }
 
 function konfirmasiHapusKelompok(kelompokId) {
-  smpmPost('delete_kelompok', { id: kelompokId }).then(function(res) {
-    if (!res.ok) { showToast(res.message || 'Gagal hapus kelompok.', 'error'); return; }
-    smpmLoadDB().then(function() { closeModal(); renderManageKelompok(); showToast('Kelompok berhasil dihapus!', 'success'); });
-  });
+  smpmPost('delete_kelompok', { id: kelompokId })
+    .then(function(res) {
+      if (!res.ok) { showToast(res.message || 'Gagal hapus kelompok.', 'error'); return; }
+      smpmLoadDB().then(function() { closeModal(); renderManageKelompok(); showToast('Kelompok berhasil dihapus!', 'success'); });
+    })
+    .catch(function(err) { smpmHandleError(err); });
 }
 
 /* TUGAS */
@@ -496,18 +575,22 @@ function submitTambahTugas(kelompokId) {
   if (!deadline) { showToast('Deadline wajib!', 'error'); return; }
   var btn = document.querySelector('#modal-body .btn-primary');
   if (btn) { btn.disabled = true; btn.textContent = 'Menyimpan...'; }
-  smpmPost('add_tugas', { judul: judul, kelompok_id: kelompokId, assignee_id: assignee, deadline: deadline, status: status, deskripsi: deskripsi }).then(function(res) {
-    if (btn) { btn.disabled = false; btn.textContent = 'Simpan Tugas'; }
-    if (!res.ok) { showToast(res.message || 'Gagal tambah tugas.', 'error'); return; }
-    smpmLoadDB().then(function() { closeModal(); renderTugasDosen(); showToast('Tugas "' + judul + '" berhasil ditambahkan!', 'success'); });
-  });
+  smpmPost('add_tugas', { judul: judul, kelompok_id: kelompokId, assignee_id: assignee, deadline: deadline, status: status, deskripsi: deskripsi })
+    .then(function(res) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Simpan Tugas'; }
+      if (!res.ok) { showToast(res.message || 'Gagal tambah tugas.', 'error'); return; }
+      smpmLoadDB().then(function() { closeModal(); renderTugasDosen(); showToast('Tugas "' + judul + '" berhasil ditambahkan!', 'success'); });
+    })
+    .catch(function(err) { if (btn) { btn.disabled = false; btn.textContent = 'Simpan Tugas'; } smpmHandleError(err); });
 }
 
 function confirmHapusTugas(tugasId) {
-  smpmPost('delete_tugas', { id: tugasId }).then(function(res) {
-    if (!res.ok) { showToast(res.message || 'Gagal hapus tugas.', 'error'); return; }
-    smpmLoadDB().then(function() { closeModal(); renderTugasDosen(); showToast('Tugas berhasil dihapus!', 'success'); });
-  });
+  smpmPost('delete_tugas', { id: tugasId })
+    .then(function(res) {
+      if (!res.ok) { showToast(res.message || 'Gagal hapus tugas.', 'error'); return; }
+      smpmLoadDB().then(function() { closeModal(); renderTugasDosen(); showToast('Tugas berhasil dihapus!', 'success'); });
+    })
+    .catch(function(err) { smpmHandleError(err); });
 }
 
 /* PENILAIAN */
@@ -518,19 +601,21 @@ function simpanNilai(kelompokId) {
   var feedback   = feedbackEl ? feedbackEl.value.trim() : '';
   if (!nilaiEl || !nilaiEl.value) { showToast('Masukkan nilai terlebih dahulu!', 'error'); return; }
   if (isNaN(nilaiVal) || nilaiVal < 0 || nilaiVal > 100) { showToast('Nilai harus antara 0-100!', 'error'); return; }
-  smpmPost('save_penilaian', { kelompok_id: kelompokId, nilai: nilaiVal, feedback: feedback }).then(function(res) {
-    if (!res.ok) { showToast(res.message || 'Gagal simpan penilaian.', 'error'); return; }
-    smpmLoadDB().then(function() {
-      var gradeEl = document.getElementById('grade-' + kelompokId);
-      if (gradeEl) {
-        gradeEl.innerHTML = nilaiVal >= 85 ? '<span class="badge badge-green">A</span>'
-          : nilaiVal >= 70 ? '<span class="badge badge-navy">B</span>'
-          : nilaiVal >= 55 ? '<span class="badge badge-amber">C</span>'
-          : '<span class="badge badge-red">D</span>';
-      }
-      showToast('Nilai berhasil disimpan!', 'success');
-    });
-  });
+  smpmPost('save_penilaian', { kelompok_id: kelompokId, nilai: nilaiVal, feedback: feedback })
+    .then(function(res) {
+      if (!res.ok) { showToast(res.message || 'Gagal simpan penilaian.', 'error'); return; }
+      smpmLoadDB().then(function() {
+        var gradeEl = document.getElementById('grade-' + kelompokId);
+        if (gradeEl) {
+          gradeEl.innerHTML = nilaiVal >= 85 ? '<span class="badge badge-green">A</span>'
+            : nilaiVal >= 70 ? '<span class="badge badge-navy">B</span>'
+            : nilaiVal >= 55 ? '<span class="badge badge-amber">C</span>'
+            : '<span class="badge badge-red">D</span>';
+        }
+        showToast('Nilai berhasil disimpan!', 'success');
+      });
+    })
+    .catch(function(err) { smpmHandleError(err); });
 }
 
 /* UPLOAD */
@@ -538,21 +623,55 @@ function submitKumpulkan(tugasId) {
   var inp     = document.getElementById('file-kumpulkan-' + tugasId);
   var catatan = ((document.getElementById('catatan-kumpulkan-' + tugasId) || {}).value || '').trim();
   if (!inp || !inp.files || !inp.files.length) { showToast('Pilih file terlebih dahulu!', 'error'); return; }
+
+  var file = inp.files[0];
   var fd = new FormData();
   fd.append('action', 'upload_file');
   fd.append('tugas_id', tugasId);
-  fd.append('file', inp.files[0]);
+  fd.append('file', file);
   if (catatan) fd.append('catatan', catatan);
+
   var btn = document.querySelector('#modal-body .btn-primary');
   if (btn) { btn.disabled = true; btn.textContent = 'Mengupload...'; }
-  smpmFetch(_smpmBase + 'api.php?action=upload_file', { method: 'POST', body: fd })
-    .then(function(r) { return r.json(); })
-    .then(function(json) {
-      if (btn) btn.disabled = false;
-      if (!json.ok) { showToast(json.message || 'Upload gagal.', 'error'); return; }
-      smpmLoadDB().then(function() { closeModal(); renderTugas(); showToast('Tugas berhasil dikumpulkan! File "' + inp.files[0].name + '" diunggah.', 'success'); });
+
+  // Naikkan timeout jadi 60 detik untuk upload file (Railway bisa lambat)
+  var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  var timer = controller ? setTimeout(function() { controller.abort(); }, 60000) : null;
+  var fetchOpts = { method: 'POST', body: fd, credentials: 'include' };
+  if (controller) fetchOpts.signal = controller.signal;
+
+  fetch(_smpmBase + 'api.php?action=upload_file', fetchOpts)
+    .then(function(r) {
+      if (timer) clearTimeout(timer);
+      // Pastikan respon adalah JSON bukan HTML error page
+      var ct = r.headers.get('Content-Type') || '';
+      if (ct.indexOf('application/json') === -1) {
+        return r.text().then(function(txt) {
+          throw new Error('Server error (' + r.status + '). ' + (txt.substring(0, 120) || ''));
+        });
+      }
+      return r.json();
     })
-    .catch(function() { if (btn) btn.disabled = false; showToast('Koneksi gagal. Coba lagi.', 'error'); });
+    .then(function(json) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Kumpulkan Tugas'; }
+      if (!json.ok) {
+        showToast(json.message || 'Upload gagal.', 'error');
+        return;
+      }
+      smpmLoadDB().then(function() {
+        closeModal();
+        renderTugas();
+        showToast('Tugas berhasil dikumpulkan! File "' + file.name + '" diunggah.', 'success');
+      });
+    })
+    .catch(function(err) {
+      if (timer) clearTimeout(timer);
+      if (btn) { btn.disabled = false; btn.textContent = 'Kumpulkan Tugas'; }
+      var msg = (err && err.name === 'AbortError')
+        ? 'Upload timeout. File mungkin terlalu besar atau koneksi lambat. Coba lagi.'
+        : (err && err.message ? err.message : 'Koneksi gagal. Coba lagi.');
+      showToast(msg, 'error');
+    });
 }
 
 function handleUpload() {
@@ -560,22 +679,57 @@ function handleUpload() {
   var input    = document.getElementById('upload-input');
   if (!tugasSel || !tugasSel.value) { showToast('Pilih tugas terlebih dahulu!', 'error'); return; }
   if (!input || !input.files.length) { showToast('Pilih file terlebih dahulu!', 'error'); return; }
+
+  var file = input.files[0];
   var fd = new FormData();
   fd.append('action', 'upload_file');
   fd.append('tugas_id', parseInt(tugasSel.value));
-  fd.append('file', input.files[0]);
-  smpmFetch(_smpmBase + 'api.php?action=upload_file', { method: 'POST', body: fd })
-    .then(function(r) { return r.json(); })
-    .then(function(json) {
-      if (!json.ok) { showToast(json.message || 'Upload gagal.', 'error'); return; }
-      smpmLoadDB().then(function() { input.value = ''; tugasSel.value = ''; renderUpload(); showToast('File berhasil diupload!', 'success'); });
+  fd.append('file', file);
+
+  var btn = document.getElementById('btn-upload-submit');
+  if (btn) { btn.disabled = true; btn.textContent = 'Mengupload...'; }
+
+  var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  var timer = controller ? setTimeout(function() { controller.abort(); }, 60000) : null;
+  var fetchOpts = { method: 'POST', body: fd, credentials: 'include' };
+  if (controller) fetchOpts.signal = controller.signal;
+
+  fetch(_smpmBase + 'api.php?action=upload_file', fetchOpts)
+    .then(function(r) {
+      if (timer) clearTimeout(timer);
+      var ct = r.headers.get('Content-Type') || '';
+      if (ct.indexOf('application/json') === -1) {
+        return r.text().then(function(txt) {
+          throw new Error('Server error (' + r.status + '). ' + (txt.substring(0, 120) || ''));
+        });
+      }
+      return r.json();
     })
-    .catch(function() { showToast('Koneksi gagal. Coba lagi.', 'error'); });
+    .then(function(json) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Upload'; }
+      if (!json.ok) { showToast(json.message || 'Upload gagal.', 'error'); return; }
+      smpmLoadDB().then(function() {
+        input.value = '';
+        tugasSel.value = '';
+        renderUpload();
+        showToast('File "' + file.name + '" berhasil diupload!', 'success');
+      });
+    })
+    .catch(function(err) {
+      if (timer) clearTimeout(timer);
+      if (btn) { btn.disabled = false; btn.textContent = 'Upload'; }
+      var msg = (err && err.name === 'AbortError')
+        ? 'Upload timeout. Coba lagi atau gunakan file yang lebih kecil.'
+        : (err && err.message ? err.message : 'Koneksi gagal. Coba lagi.');
+      showToast(msg, 'error');
+    });
 }
 
 function konfirmasiHapusUpload(uploadId) {
-  smpmPost('delete_upload', { id: uploadId }).then(function(res) {
-    if (!res.ok) { showToast(res.message || 'Gagal hapus.', 'error'); return; }
-    smpmLoadDB().then(function() { closeModal(); renderUpload(); showToast('File berhasil dihapus!', 'success'); });
-  });
+  smpmPost('delete_upload', { id: uploadId })
+    .then(function(res) {
+      if (!res.ok) { showToast(res.message || 'Gagal hapus.', 'error'); return; }
+      smpmLoadDB().then(function() { closeModal(); renderUpload(); showToast('File berhasil dihapus!', 'success'); });
+    })
+    .catch(function(err) { smpmHandleError(err); });
 }
