@@ -130,7 +130,7 @@ switch ($action) {
         $kelompok   = db()->query('SELECT k.*,u.nama AS dosen_nama FROM kelompok k LEFT JOIN users u ON k.dosen_id=u.id ORDER BY k.id')->fetchAll();
         $users      = db()->query('SELECT id,nama,nim,email,role,avatar,kelompok_id FROM users ORDER BY role,nama')->fetchAll();
         $tugas      = db()->query('SELECT * FROM tugas ORDER BY deadline ASC')->fetchAll();
-        $uploads    = db()->query('SELECT * FROM uploads ORDER BY uploaded_at DESC')->fetchAll();
+        $uploads    = db()->query('SELECT id,nama_file,path_file,ukuran,tipe,kelompok_id,user_id,tugas_id,uploaded_at FROM uploads ORDER BY uploaded_at DESC')->fetchAll();
         $penilaian  = db()->query('SELECT * FROM penilaian')->fetchAll();
 
         jsonOk(compact('kelompok','users','tugas','uploads','penilaian'));
