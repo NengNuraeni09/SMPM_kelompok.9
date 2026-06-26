@@ -1,6 +1,6 @@
 ﻿/* =============================================
-   SMPM — Sistem Manajemen Proyek Mahasiswa
-   app.js — Main Application Logic
+   SMPM - Sistem Manajemen Proyek Mahasiswa
+   app.js - Main Application Logic
    ============================================= */
 
 'use strict';
@@ -178,7 +178,7 @@ function renderDashboard() {
         </div>
         <div class="progress-wrap"><div class="progress-fill progress-blue" style="width:${kelompok.progress}%"></div></div>
         
-        <!-- Statistik ringkas 2x2 grid — mobile friendly -->
+        <!-- Statistik ringkas 2x2 grid - mobile friendly -->
         <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
           <div class="text-sm font-600 mb-12">Statistik Penyelesaian Tugas</div>
           <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
@@ -410,7 +410,7 @@ function showKumpulkanModal(tugasId) {
         <div id="preview-kumpulkan-${tugasId}" style="display:none;margin-top:8px;padding:10px 14px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border)">
           <div class="flex items-center justify-between gap-10">
             <div class="flex items-center gap-10">
-              <div id="icon-kumpulkan-${tugasId}" style="width:32px;height:32px;background:var(--accent-lt);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;color:var(--accent)">—</div>
+              <div id="icon-kumpulkan-${tugasId}" style="width:32px;height:32px;background:var(--accent-lt);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;color:var(--accent)">-</div>
               <div>
                 <div id="name-kumpulkan-${tugasId}" style="font-size:.85rem;font-weight:600"></div>
                 <div id="size-kumpulkan-${tugasId}" style="font-size:.72rem;color:var(--text-3)"></div>
@@ -536,130 +536,125 @@ function lihatFileTugas(uploadId) {
 
   const isImage = ['PNG','JPG','JPEG','GIF','SVG','WEBP'].includes(u.tipe);
   const isPdf   = u.tipe === 'PDF';
+  const hasFile = !!u.path_file;
 
-  /* preview area */
+  // Placeholder sementara saat preview di-load
   let previewHtml = '';
-  // Bangun URL file dari server menggunakan path_file
-  const fileUrl = u.path_file
-    ? 'api.php?action=get_file&id=' + u.id
-    : null;
-  const downloadUrl = u.path_file
-    ? 'api.php?action=get_file&id=' + u.id + '&download=1'
-    : null;
-
-  if (fileUrl) {
+  if (hasFile) {
     if (isImage) {
-      previewHtml = `
-        <div style="margin:12px 0;text-align:center;border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;background:var(--surface);padding:8px">
-          <img src="${fileUrl}" alt="${u.nama_file}"
-            style="max-width:100%;max-height:440px;object-fit:contain;border-radius:var(--radius-md)" />
-        </div>`;
+      previewHtml = `<div id="file-preview-${u.id}" style="margin:12px 0;text-align:center;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);padding:20px;color:var(--text-3);font-size:.85rem">Memuat preview...</div>`;
     } else if (isPdf) {
-      previewHtml = `
-        <div style="margin:12px 0;border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;height:480px">
-          <iframe src="${fileUrl}" style="width:100%;height:100%;border:none" title="${u.nama_file}"></iframe>
-        </div>`;
+      previewHtml = `<div id="file-preview-${u.id}" style="margin:12px 0;border:1px solid var(--border);border-radius:var(--radius-md);height:480px;background:var(--surface);display:flex;align-items:center;justify-content:center;color:var(--text-3);font-size:.85rem">Memuat PDF...</div>`;
     } else {
       previewHtml = `
         <div style="margin:12px 0;border:2px dashed var(--border);border-radius:var(--radius-md);padding:32px 20px;text-align:center;background:var(--surface)">
-          <div style="font-size:2.5rem;margin-bottom:10px">${u.tipe}</div>
+          <div style="font-size:2rem;font-weight:700;color:var(--accent);margin-bottom:8px">${u.tipe}</div>
           <div style="font-weight:600;color:var(--text-2);margin-bottom:6px">${u.nama_file}</div>
-          <div style="font-size:.82rem;color:var(--text-3)">Klik tombol unduh untuk mengunduh file ini.</div>
+          <div style="font-size:.82rem;color:var(--text-3)">Klik tombol Unduh untuk mengunduh file.</div>
         </div>`;
     }
-  } else if (u.dataUrl) {
-    if (isImage) {
-      previewHtml = `
-        <div style="margin:12px 0;text-align:center;border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;background:var(--surface);padding:8px">
-          <img src="${u.dataUrl}" alt="${u.nama_file}"
-            style="max-width:100%;max-height:440px;object-fit:contain;border-radius:var(--radius-md)" />
-        </div>`;
-    } else if (isPdf) {
-      previewHtml = `
-        <div style="margin:12px 0;border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;height:480px">
-          <iframe src="${u.dataUrl}" style="width:100%;height:100%;border:none" title="${u.nama_file}"></iframe>
-        </div>`;
-    }
-  }
-
-  /* fallback when no real file */
-  if (!previewHtml) {
+  } else {
     previewHtml = `
-      <div style="margin:12px 0;border:2px dashed var(--border);border-radius:var(--radius-md);padding:40px 20px;text-align:center;background:var(--surface)">
-        <div style="font-size:3rem;margin-bottom:10px">${u.tipe || 'FILE'}</div>
-        <div style="font-weight:600;color:var(--text-2);margin-bottom:6px">${u.nama_file}</div>
-        <div style="font-size:.82rem;color:var(--text-3)">Preview tidak tersedia.</div>
+      <div style="margin:12px 0;border:2px dashed var(--border);border-radius:var(--radius-md);padding:32px 20px;text-align:center;background:var(--surface)">
+        <div style="font-size:.85rem;color:var(--text-3)">File tidak tersedia.</div>
       </div>`;
   }
 
   body.style.maxWidth = '700px';
   body.innerHTML = `
     <div class="modal-header">
-      <div class="modal-title" style="display:flex;align-items:center;gap:8px;word-break:break-all">
-        ${isPdf ? '' : isImage ? '' : u.tipe==='ZIP' ? '' : ''}
-        <span style="flex:1">${u.nama_file}</span>
+      <div class="modal-title" style="display:flex;align-items:center;gap:8px;word-break:break-all;flex:1;min-width:0">
+        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${u.nama_file}</span>
       </div>
-      <button class="modal-close" onclick="closeModal()">&times;</button>
+      <button class="modal-close" onclick="closeModal()" style="flex-shrink:0">&times;</button>
     </div>
-    <div style="max-height:85vh;overflow-y:auto">
-
-      <!-- Meta info -->
-      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:4px">
-        <div style="flex:1;min-width:150px;padding:10px 14px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border)">
-          <div style="font-size:.72rem;color:var(--text-3);margin-bottom:4px">Dikirim oleh</div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <div class="avatar" style="width:26px;height:26px;font-size:.6rem">${uploader ? uploader.avatar : '?'}</div>
-            <div>
-              <div style="font-size:.85rem;font-weight:600">${uploader ? uploader.nama : '-'}</div>
-              <div style="font-size:.72rem;color:var(--text-3)">${uploader ? uploader.nim : ''}</div>
-            </div>
-          </div>
+    <div style="max-height:85vh;overflow-y:auto;padding-right:2px">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+        <div style="flex:1;min-width:120px;padding:10px 12px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border)">
+          <div style="font-size:.7rem;color:var(--text-3);margin-bottom:3px">Dikirim oleh</div>
+          <div style="font-size:.83rem;font-weight:600">${uploader ? uploader.nama : '-'}</div>
         </div>
-        <div style="flex:1;min-width:130px;padding:10px 14px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border)">
-          <div style="font-size:.72rem;color:var(--text-3);margin-bottom:4px">Kelompok</div>
-          <div style="font-size:.85rem;font-weight:600">${kelompok ? kelompok.nama : '-'}</div>
+        <div style="flex:1;min-width:100px;padding:10px 12px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border)">
+          <div style="font-size:.7rem;color:var(--text-3);margin-bottom:3px">Kelompok</div>
+          <div style="font-size:.83rem;font-weight:600">${kelompok ? kelompok.nama : '-'}</div>
         </div>
-        <div style="flex:1;min-width:130px;padding:10px 14px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border)">
-          <div style="font-size:.72rem;color:var(--text-3);margin-bottom:4px">Waktu upload</div>
-          <div style="font-size:.85rem;font-weight:600">${u.tanggal}</div>
-          <div style="font-size:.72rem;color:var(--text-3)">${u.ukuran}</div>
+        <div style="flex:1;min-width:100px;padding:10px 12px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border)">
+          <div style="font-size:.7rem;color:var(--text-3);margin-bottom:3px">Ukuran</div>
+          <div style="font-size:.83rem;font-weight:600">${u.ukuran}</div>
         </div>
       </div>
-
       ${tugas ? `
-      <div style="padding:10px 14px;background:var(--surface);border-radius:var(--radius-md);border-left:3px solid var(--accent);margin-bottom:4px">
-        <div style="font-size:.72rem;color:var(--text-3);margin-bottom:2px">Untuk tugas</div>
-        <div style="font-size:.88rem;font-weight:600">${tugas.judul}</div>
-        <div style="font-size:.75rem;color:var(--text-3);margin-top:2px">
-          Deadline: ${formatDate(tugas.deadline)} &nbsp;&middot;&nbsp; ${statusBadge(tugas.status)}
-        </div>
+      <div style="padding:10px 12px;background:var(--surface);border-radius:var(--radius-md);border-left:3px solid var(--accent);margin-bottom:8px">
+        <div style="font-size:.7rem;color:var(--text-3);margin-bottom:2px">Untuk tugas</div>
+        <div style="font-size:.85rem;font-weight:600">${tugas.judul}</div>
+        <div style="font-size:.74rem;color:var(--text-3);margin-top:2px">Deadline: ${formatDate(tugas.deadline)}</div>
       </div>` : ''}
-
-      ${u.catatan ? `
-      <div style="padding:10px 14px;background:#fffbeb;border-radius:var(--radius-md);border:1px solid #fde68a;margin-bottom:4px">
-        <div style="font-size:.72rem;font-weight:600;color:#92400e;margin-bottom:3px"> Catatan mahasiswa</div>
-        <div style="font-size:.85rem;color:#78350f">${u.catatan}</div>
-      </div>` : ''}
-
       ${previewHtml}
-
-      <!-- Action buttons -->
       <div style="display:flex;gap:10px;margin-top:12px">
-        ${(downloadUrl || u.dataUrl)
-          ? `<a href="${downloadUrl || u.dataUrl}" download="${u.nama_file}" class="btn btn-primary"
-               style="flex:1;justify-content:center;display:flex;align-items:center;gap:6px"
-               target="_blank" rel="noopener noreferrer">
+        ${hasFile
+          ? `<button id="btn-unduh-${u.id}" class="btn btn-primary" onclick="unduhFile(${u.id},'${u.nama_file.replace(/'/g,"\\\'")}')"
+               style="flex:1;justify-content:center;display:flex;align-items:center;gap:6px">
                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
                Unduh File
-             </a>`
-          : `<button class="btn btn-primary" style="flex:1;justify-content:center;opacity:.5;cursor:not-allowed" disabled>
-               Tidak tersedia
-             </button>`}
+             </button>`
+          : `<button class="btn btn-primary" style="flex:1;justify-content:center;opacity:.5;cursor:not-allowed" disabled>Tidak tersedia</button>`}
         <button class="btn btn-outline" onclick="closeModal()" style="flex:1;justify-content:center">Tutup</button>
       </div>
     </div>
   `;
   overlay.classList.remove('hidden');
+
+  // Load preview via fetch (session cookie ikut otomatis karena same-origin)
+  if (hasFile && (isImage || isPdf)) {
+    var apiUrl = (typeof _smpmBase !== 'undefined' ? _smpmBase : '') + 'api.php?action=get_file&id=' + u.id;
+    fetch(apiUrl, { credentials: 'include' })
+      .then(function(r) {
+        if (!r.ok) throw new Error('Gagal');
+        return r.blob();
+      })
+      .then(function(blob) {
+        var blobUrl = URL.createObjectURL(blob);
+        var previewEl = document.getElementById('file-preview-' + u.id);
+        if (!previewEl) return;
+        if (isImage) {
+          previewEl.innerHTML = '<img src="' + blobUrl + '" alt="' + u.nama_file + '" style="max-width:100%;max-height:440px;object-fit:contain;border-radius:var(--radius-md)" />';
+          previewEl.style.padding = '8px';
+        } else {
+          previewEl.innerHTML = '<iframe src="' + blobUrl + '" style="width:100%;height:100%;border:none" title="' + u.nama_file + '"></iframe>';
+        }
+      })
+      .catch(function() {
+        var previewEl = document.getElementById('file-preview-' + u.id);
+        if (previewEl) previewEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-3);font-size:.85rem">Preview tidak tersedia. Gunakan tombol Unduh.</div>';
+      });
+  }
+}
+
+/* Unduh file via fetch + blob - session cookie ikut, tidak buka tab baru */
+function unduhFile(uploadId, namaFile) {
+  var btn = document.getElementById('btn-unduh-' + uploadId);
+  if (btn) { btn.disabled = true; btn.textContent = 'Mengunduh...'; }
+
+  var apiUrl = (typeof _smpmBase !== 'undefined' ? _smpmBase : '') + 'api.php?action=get_file&id=' + uploadId + '&download=1';
+  fetch(apiUrl, { credentials: 'include' })
+    .then(function(r) {
+      if (!r.ok) return r.json().then(function(j) { throw new Error(j.message || 'Gagal'); });
+      return r.blob();
+    })
+    .then(function(blob) {
+      var blobUrl = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = namaFile;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function() { URL.revokeObjectURL(blobUrl); a.remove(); }, 1000);
+      if (btn) { btn.disabled = false; btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> Unduh File'; }
+    })
+    .catch(function(err) {
+      showToast('Gagal mengunduh: ' + (err.message || 'Coba lagi'), 'error');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> Unduh File'; }
+    });
 }
 
 /* ---- DEADLINE ---- */
@@ -1100,7 +1095,7 @@ function renderTugasRows(kelompokId) {
             </svg>
           </span>`).join('<br>')
       : t.file
-        ? `<span class="badge badge-navy" style="font-size:.72rem;opacity:.65" title="File data lama — tidak dapat dibuka"> ${t.file}</span>`
+        ? `<span class="badge badge-navy" style="font-size:.72rem;opacity:.65" title="File data lama - tidak dapat dibuka"> ${t.file}</span>`
         : `<span class="text-muted text-sm" style="font-size:.78rem">Belum dikumpulkan</span>`;
 
     return `
@@ -1139,7 +1134,7 @@ function showTambahTugasModal(kelompokId) {
   const today = new Date().toISOString().split('T')[0];
   body.innerHTML = `
     <div class="modal-header">
-      <div class="modal-title">Tambah Tugas — ${kelompok ? kelompok.nama : ''}</div>
+      <div class="modal-title">Tambah Tugas - ${kelompok ? kelompok.nama : ''}</div>
       <button class="modal-close" onclick="closeModal()">&times;</button>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">
@@ -1216,7 +1211,7 @@ function showEditTugasModal(tugasId) {
 
   body.innerHTML = `
     <div class="modal-header">
-      <div class="modal-title">Edit Tugas — ${kelompok ? kelompok.nama : ''}</div>
+      <div class="modal-title">Edit Tugas - ${kelompok ? kelompok.nama : ''}</div>
       <button class="modal-close" onclick="closeModal()">&times;</button>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">
@@ -1532,7 +1527,7 @@ function renderPenilaian() {
 
   container.innerHTML = `
     <div class="card">
-      <div class="card-title">Penilaian Kelompok — Mata Kuliah RPL Lanjut</div>
+      <div class="card-title">Penilaian Kelompok - Mata Kuliah RPL Lanjut</div>
       <div class="table-wrap">
         <table class="data-table">
           <thead><tr><th>Kelompok</th><th>Tema</th><th>Progress</th><th>Nilai (0-100)</th><th>Grade</th><th>Feedback</th><th>Aksi</th></tr></thead>
@@ -2046,7 +2041,7 @@ function showEditUserModal(userId) {
   
   body.innerHTML = `
     <div class="modal-header">
-      <div class="modal-title">Edit User — ${user.nama}</div>
+      <div class="modal-title">Edit User - ${user.nama}</div>
       <button class="modal-close" onclick="closeModal()">&times;</button>
     </div>
     <div class="flex-col gap-12" style="display:flex;gap:12px">
@@ -2347,7 +2342,7 @@ function renderKelompokTable() {
       <td class="text-muted text-sm">${i+1}</td>
       <td><strong>${k.nama}</strong></td>
       <td class="text-muted text-sm" style="max-width:200px">${k.tema}</td>
-      <td class="text-sm">${k.dosenObj ? k.dosenObj.nama.split(' ').slice(0,3).join(' ') : '<span class="text-muted">—</span>'}</td>
+      <td class="text-sm">${k.dosenObj ? k.dosenObj.nama.split(' ').slice(0,3).join(' ') : '<span class="text-muted">-</span>'}</td>
       <td style="text-align:center">
         <span style="font-weight:700;color:${k.jumlahAnggota>=MAX_ANGGOTA?'var(--danger)':'var(--text-1)'}">${k.jumlahAnggota}</span>
         <span class="text-muted text-sm">/${MAX_ANGGOTA}</span>
@@ -2514,7 +2509,7 @@ function showDetailKelompokAdmin(kelompokId) {
                     <div style="flex:1;min-width:0">
                       <div style="font-size:.84rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.judul}</div>
                       <div style="font-size:.72rem;color:var(--text-3);margin-top:2px">
-                        ${assignee ? assignee.nama : '—'} &nbsp;&middot;&nbsp; ${formatDate(t.deadline)}
+                        ${assignee ? assignee.nama : '-'} &nbsp;&middot;&nbsp; ${formatDate(t.deadline)}
                       </div>
                     </div>
                     <div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
@@ -2542,10 +2537,10 @@ function showDetailKelompokAdmin(kelompokId) {
         ${penilaian && penilaian.nilai !== null
           ? `<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
                <div style="font-size:2rem;font-weight:800;color:var(--accent)">${penilaian.nilai}<span style="font-size:.9rem;font-weight:400;color:var(--text-3)">/100</span></div>
-               ${penilaian.nilai>=85?'<span class="badge badge-success">A — Sangat Baik</span>'
-                :penilaian.nilai>=70?'<span class="badge badge-navy">B — Baik</span>'
-                :penilaian.nilai>=55?'<span class="badge" style="background:#f59e0b22;color:#d97706">C — Cukup</span>'
-                :'<span class="badge badge-danger">D — Kurang</span>'}
+               ${penilaian.nilai>=85?'<span class="badge badge-success">A - Sangat Baik</span>'
+                :penilaian.nilai>=70?'<span class="badge badge-navy">B - Baik</span>'
+                :penilaian.nilai>=55?'<span class="badge" style="background:#f59e0b22;color:#d97706">C - Cukup</span>'
+                :'<span class="badge badge-danger">D - Kurang</span>'}
              </div>
              ${penilaian.feedback?`<div style="font-size:.82rem;color:var(--text-2);margin-top:6px;font-style:italic">"${penilaian.feedback}"</div>`:''}
              <div style="font-size:.72rem;color:var(--text-3);margin-top:4px">Dinilai: ${formatDate(penilaian.tanggal)}</div>`
@@ -2964,7 +2959,7 @@ function showSettings() {
       
       <div style="padding-top:16px;border-top:1px solid var(--border);margin-top:8px">
         <p style="font-size:.75rem;color:var(--text-3);margin-bottom:8px">Info Aplikasi</p>
-        <p style="font-size:.82rem">SMPM v1.0 — Sistem Manajemen Proyek Mahasiswa</p>
+        <p style="font-size:.82rem">SMPM v1.0 - Sistem Manajemen Proyek Mahasiswa</p>
         <p style="font-size:.75rem;color:var(--text-3);margin-top:4px">Kelompok 09 &middot; Studi Kasus Pemrograman Web</p>
       </div>
     </div>
@@ -3031,7 +3026,7 @@ function downloadPDF(filename, content) {
   win.document.write('</style></head><body>');
   win.document.write(content);
   win.document.write('<div class="footer">');
-  win.document.write('<p>SMPM — Sistem Manajemen Proyek Mahasiswa &middot; Kelompok 09</p>');
+  win.document.write('<p>SMPM - Sistem Manajemen Proyek Mahasiswa &middot; Kelompok 09</p>');
   win.document.write('<p>Dicetak pada: ' + new Date().toLocaleString('id-ID') + '</p>');
   win.document.write('</div>');
   win.document.write('</body></html>');
@@ -3204,8 +3199,8 @@ function showRegisterPage() {
   if (kelompokSelect) {
     const kelompokList = DB.kelompok.filter(k => k.status === 'aktif');
     kelompokSelect.innerHTML = `
-      <option value="">— Pilih kelompok Anda —</option>
-      ${kelompokList.map(k => `<option value="${k.id}">${k.nama} — ${k.tema}</option>`).join('')}
+      <option value="">- Pilih kelompok Anda -</option>
+      ${kelompokList.map(k => `<option value="${k.id}">${k.nama} - ${k.tema}</option>`).join('')}
     `;
   }
 
