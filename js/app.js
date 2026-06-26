@@ -2308,6 +2308,14 @@ function renderManageKelompok() {
   const container = document.getElementById('manageKelompok-list');
   if (!container) return;
 
+  // Reset filter saat pertama kali masuk halaman agar tidak ada filter tersisa
+  KK.search = '';
+  KK.filterDosen = '';
+  KK.filterStatus = '';
+  KK.filterPerhatian = false;
+  KK.sortKey = '';
+  KK.sortDir = 1;
+
   const dosenList = DB.users.filter(u => u.role === 'dosen');
 
   /* ---- stat summary ---- */
@@ -2438,17 +2446,22 @@ function renderKelompokTable() {
     dosenObj:      DB.users.find(u => u.id === k.dosen_id) || null,
   }));
 
-  /* filter */
+  /* filter — normalisasi string agar case & whitespace tidak jadi masalah */
   if (KK.search) {
-    const q = KK.search.toLowerCase();
-    list = list.filter(k => k.nama.toLowerCase().includes(q) || k.tema.toLowerCase().includes(q));
+    const q = KK.search.toLowerCase().trim();
+    list = list.filter(k =>
+      (k.nama || '').toLowerCase().includes(q) ||
+      (k.tema || '').toLowerCase().includes(q)
+    );
   }
   if (KK.filterDosen === 'none') {
     list = list.filter(k => !k.dosen_id);
   } else if (KK.filterDosen) {
-    list = list.filter(k => k.dosen_id == KK.filterDosen);
+    list = list.filter(k => String(k.dosen_id) === String(KK.filterDosen));
   }
-  if (KK.filterStatus) list = list.filter(k => k.status === KK.filterStatus);
+  if (KK.filterStatus) {
+    list = list.filter(k => (k.status || '').toLowerCase() === KK.filterStatus.toLowerCase());
+  }
   if (KK.filterPerhatian) list = list.filter(k => k.progress < 50);
 
   /* sort */
@@ -2468,8 +2481,18 @@ function renderKelompokTable() {
 
   if (countEl) countEl.textContent = `Menampilkan ${list.length} dari ${DB.kelompok.length} kelompok`;
 
+  if (DB.kelompok.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--text-3)">
+      Belum ada data kelompok. Tambahkan kelompok baru dengan tombol di atas.
+    </td></tr>`;
+    return;
+  }
+
   if (list.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--text-3)">Tidak ada kelompok yang sesuai filter.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--text-3)">
+      Tidak ada kelompok yang sesuai filter.
+      <br><a href="javascript:void(0)" onclick="KK.search='';KK.filterDosen='';KK.filterStatus='';KK.filterPerhatian=false;KK.sortKey='';renderManageKelompok()" style="color:var(--accent);font-size:.85rem">Reset filter</a>
+    </td></tr>`;
     return;
   }
 

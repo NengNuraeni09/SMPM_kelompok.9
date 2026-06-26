@@ -326,6 +326,28 @@ function smpmGoToLogin() {
 // Patch forms SEGERA saat script ini jalan
 smpmPatchForms();
 
+// Override showPage agar halaman admin selalu refresh data dari server
+(function() {
+  var origShowPage = window.showPage;
+  if (!origShowPage) return;
+  window.showPage = function(name) {
+    // Untuk halaman yang butuh data fresh, load dulu baru render
+    var needsRefresh = ['manageKelompok', 'manageUser', 'monitoring', 'penilaian', 'tugasDosen', 'dashboard'];
+    if (needsRefresh.indexOf(name) !== -1 && currentUser) {
+      origShowPage(name); // tampilkan halaman dulu (skeleton)
+      smpmLoadDB().then(function() {
+        // Re-render setelah data fresh
+        if (typeof renderPage === 'function') renderPage(name);
+      }).catch(function() {
+        // Tetap render dengan data yang ada
+        if (typeof renderPage === 'function') renderPage(name);
+      });
+    } else {
+      origShowPage(name);
+    }
+  };
+})();
+
 (function smpmInit() {
   var loadingEl = document.createElement('div');
   loadingEl.id = 'smpm-loading';
