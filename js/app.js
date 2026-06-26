@@ -539,7 +539,35 @@ function lihatFileTugas(uploadId) {
 
   /* preview area */
   let previewHtml = '';
-  if (u.dataUrl) {
+  // Bangun URL file dari server menggunakan path_file
+  const fileUrl = u.path_file
+    ? 'api.php?action=get_file&id=' + u.id
+    : null;
+  const downloadUrl = u.path_file
+    ? 'api.php?action=get_file&id=' + u.id + '&download=1'
+    : null;
+
+  if (fileUrl) {
+    if (isImage) {
+      previewHtml = `
+        <div style="margin:12px 0;text-align:center;border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;background:var(--surface);padding:8px">
+          <img src="${fileUrl}" alt="${u.nama_file}"
+            style="max-width:100%;max-height:440px;object-fit:contain;border-radius:var(--radius-md)" />
+        </div>`;
+    } else if (isPdf) {
+      previewHtml = `
+        <div style="margin:12px 0;border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;height:480px">
+          <iframe src="${fileUrl}" style="width:100%;height:100%;border:none" title="${u.nama_file}"></iframe>
+        </div>`;
+    } else {
+      previewHtml = `
+        <div style="margin:12px 0;border:2px dashed var(--border);border-radius:var(--radius-md);padding:32px 20px;text-align:center;background:var(--surface)">
+          <div style="font-size:2.5rem;margin-bottom:10px">${u.tipe}</div>
+          <div style="font-weight:600;color:var(--text-2);margin-bottom:6px">${u.nama_file}</div>
+          <div style="font-size:.82rem;color:var(--text-3)">Klik tombol unduh untuk mengunduh file ini.</div>
+        </div>`;
+    }
+  } else if (u.dataUrl) {
     if (isImage) {
       previewHtml = `
         <div style="margin:12px 0;text-align:center;border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;background:var(--surface);padding:8px">
@@ -554,18 +582,13 @@ function lihatFileTugas(uploadId) {
     }
   }
 
-  /* fallback when no real file (mock data) */
+  /* fallback when no real file */
   if (!previewHtml) {
-    const icon = isPdf ? '' : isImage ? '' : u.tipe === 'ZIP' ? ''
-               : (u.tipe === 'DOC' || u.tipe === 'DOCX') ? '' : '';
     previewHtml = `
       <div style="margin:12px 0;border:2px dashed var(--border);border-radius:var(--radius-md);padding:40px 20px;text-align:center;background:var(--surface)">
-        <div style="font-size:3.5rem;margin-bottom:10px">${icon}</div>
+        <div style="font-size:3rem;margin-bottom:10px">${u.tipe || 'FILE'}</div>
         <div style="font-weight:600;color:var(--text-2);margin-bottom:6px">${u.nama_file}</div>
-        <div style="font-size:.82rem;color:var(--text-3)">
-          File demo — preview tidak tersedia.<br>
-          Pada sistem nyata, file ini dapat dibuka dan diunduh langsung.
-        </div>
+        <div style="font-size:.82rem;color:var(--text-3)">Preview tidak tersedia.</div>
       </div>`;
   }
 
@@ -622,14 +645,15 @@ function lihatFileTugas(uploadId) {
 
       <!-- Action buttons -->
       <div style="display:flex;gap:10px;margin-top:12px">
-        ${u.dataUrl
-          ? `<a href="${u.dataUrl}" download="${u.nama_file}" class="btn btn-primary"
-               style="flex:1;justify-content:center;display:flex;align-items:center;gap:6px">
+        ${(downloadUrl || u.dataUrl)
+          ? `<a href="${downloadUrl || u.dataUrl}" download="${u.nama_file}" class="btn btn-primary"
+               style="flex:1;justify-content:center;display:flex;align-items:center;gap:6px"
+               target="_blank" rel="noopener noreferrer">
                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
                Unduh File
              </a>`
           : `<button class="btn btn-primary" style="flex:1;justify-content:center;opacity:.5;cursor:not-allowed" disabled>
-               Unduh (demo)
+               Tidak tersedia
              </button>`}
         <button class="btn btn-outline" onclick="closeModal()" style="flex:1;justify-content:center">Tutup</button>
       </div>

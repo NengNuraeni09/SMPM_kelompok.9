@@ -18,7 +18,7 @@ window.checkSession = function() { return false; };
 // Override fungsi logout() bawaan app.js agar selalu hit server
 window.logout = function() {
   sessionStorage.removeItem('smpm_user');
-  fetch('api.php?action=logout', { method: 'POST' })
+  fetch(_smpmBase + 'api.php?action=logout', { method: 'POST' })
     .finally(function() {
       currentUser = null;
       if (typeof smpmGoToLogin === 'function') smpmGoToLogin();
@@ -29,6 +29,36 @@ window.logout = function() {
 /* ============================================================
    API HELPERS
    ============================================================ */
+
+// Base URL: pakai origin + pathname agar benar di semua environment
+var _smpmBase = (function() {
+  var p = window.location.pathname;
+  // Ambil direktori: /SMPM/ atau / (Railway root)
+  var dir = p.substring(0, p.lastIndexOf('/') + 1);
+  return window.location.origin + dir;
+})();
+
+function smpmFetch(url, opts, retries) {
+  retries = retries === undefined ? 2 : retries;
+  var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  var timer = controller ? setTimeout(function() { controller.abort(); }, 20000) : null;
+  if (controller && opts) opts.signal = controller.signal;
+  return fetch(url, opts || {})
+    .then(function(r) {
+      if (timer) clearTimeout(timer);
+      return r;
+    })
+    .catch(function(err) {
+      if (timer) clearTimeout(timer);
+      if (retries > 0) {
+        // Tunggu 1.5 detik lalu retry
+        return new Promise(function(resolve) { setTimeout(resolve, 1500); })
+          .then(function() { return smpmFetch(url, opts, retries - 1); });
+      }
+      throw err;
+    });
+}
+
 function smpmPost(action, data) {
   var fd = new FormData();
   fd.append('action', action);
@@ -37,13 +67,13 @@ function smpmPost(action, data) {
       if (data[k] !== null && data[k] !== undefined) fd.append(k, data[k]);
     });
   }
-  return fetch('api.php?action=' + encodeURIComponent(action), {
+  return smpmFetch(_smpmBase + 'api.php?action=' + encodeURIComponent(action), {
     method: 'POST', body: fd
   }).then(function(r) { return r.json(); });
 }
 
 function smpmGet(action) {
-  return fetch('api.php?action=' + encodeURIComponent(action))
+  return smpmFetch(_smpmBase + 'api.php?action=' + encodeURIComponent(action))
     .then(function(r) { return r.json(); });
 }
 
@@ -265,13 +295,28 @@ function smpmGoToLogin() {
 smpmPatchForms();
 
 (function smpmInit() {
-  // Selalu verifikasi ke server terlebih dahulu, jangan percaya
-  // window.__SMPM_SESSION__ mentah-mentah karena session PHP bisa
-  // masih tersimpan dari kunjungan sebelumnya.
+  // Tampilkan loading state agar user tahu sedang proses
+  // (Railway cold start bisa 10-30 detik)
+  var loginPage = document.getElementById('page-login');
+  var loadingEl = document.createElement('div');
+  loadingEl.id = 'smpm-loading';
+  loadingEl.style.cssText = 'position:fixed;inset:0;background:var(--navy);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;gap:16px';
+  loadingEl.innerHTML = '<div style="width:40px;height:40px;border:3px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;animation:smpm-spin 0.8s linear infinite"></div>'
+    + '<div style="color:rgba(255,255,255,.7);font-size:.875rem">Memuat sistem...</div>';
+  var style = document.createElement('style');
+  style.textContent = '@keyframes smpm-spin{to{transform:rotate(360deg)}}';
+  document.head.appendChild(style);
+  document.body.appendChild(loadingEl);
+
+  function hideLoading() {
+    var el = document.getElementById('smpm-loading');
+    if (el) el.remove();
+  }
+
   smpmGet('check_session')
     .then(function(res) {
+      hideLoading();
       if (res.ok && res.data) {
-        // Session valid di server
         currentUser = res.data;
         smpmLoadDB().then(function() {
           buildSidebar();
@@ -279,15 +324,15 @@ smpmPatchForms();
           smpmPatchNavItems();
         });
       } else {
-        // Tidak ada session valid — arahkan ke login
         smpmGoToLogin();
         smpmPatchRegisterPage();
       }
     })
     .catch(function() {
-      // Gagal koneksi — arahkan ke login
+      hideLoading();
       smpmGoToLogin();
       smpmPatchRegisterPage();
+      showToast('Server lambat merespons. Coba refresh halaman.', 'error');
     });
 })();
 
@@ -500,14 +545,14 @@ function submitKumpulkan(tugasId) {
   if (catatan) fd.append('catatan', catatan);
   var btn = document.querySelector('#modal-body .btn-primary');
   if (btn) { btn.disabled = true; btn.textContent = 'Mengupload...'; }
-  fetch('api.php?action=upload_file', { method: 'POST', body: fd })
+  smpmFetch(_smpmBase + 'api.php?action=upload_file', { method: 'POST', body: fd })
     .then(function(r) { return r.json(); })
     .then(function(json) {
       if (btn) btn.disabled = false;
       if (!json.ok) { showToast(json.message || 'Upload gagal.', 'error'); return; }
       smpmLoadDB().then(function() { closeModal(); renderTugas(); showToast('Tugas berhasil dikumpulkan! File "' + inp.files[0].name + '" diunggah.', 'success'); });
     })
-    .catch(function() { if (btn) btn.disabled = false; showToast('Koneksi gagal.', 'error'); });
+    .catch(function() { if (btn) btn.disabled = false; showToast('Koneksi gagal. Coba lagi.', 'error'); });
 }
 
 function handleUpload() {
@@ -519,13 +564,13 @@ function handleUpload() {
   fd.append('action', 'upload_file');
   fd.append('tugas_id', parseInt(tugasSel.value));
   fd.append('file', input.files[0]);
-  fetch('api.php?action=upload_file', { method: 'POST', body: fd })
+  smpmFetch(_smpmBase + 'api.php?action=upload_file', { method: 'POST', body: fd })
     .then(function(r) { return r.json(); })
     .then(function(json) {
       if (!json.ok) { showToast(json.message || 'Upload gagal.', 'error'); return; }
       smpmLoadDB().then(function() { input.value = ''; tugasSel.value = ''; renderUpload(); showToast('File berhasil diupload!', 'success'); });
     })
-    .catch(function() { showToast('Koneksi gagal.', 'error'); });
+    .catch(function() { showToast('Koneksi gagal. Coba lagi.', 'error'); });
 }
 
 function konfirmasiHapusUpload(uploadId) {

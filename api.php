@@ -238,6 +238,52 @@ switch ($action) {
         db()->prepare('DELETE FROM uploads WHERE id=?')->execute([$id]);
         jsonOk();
 
+    /* ---------- SERVE / DOWNLOAD FILE ---------- */
+
+    case 'get_file':
+        requireLogin();
+        $id = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
+        if (!$id) jsonErr('ID tidak valid.');
+        $row = db()->prepare('SELECT * FROM uploads WHERE id=? LIMIT 1'); $row->execute([$id]);
+        $up = $row->fetch();
+        if (!$up) jsonErr('File tidak ditemukan.', 404);
+
+        // Cek akses: mahasiswa hanya bisa lihat file kelompoknya sendiri
+        $user = $_SESSION['user'];
+        if ($user['role'] === 'mahasiswa' && (int)$up['kelompok_id'] !== (int)$user['kelompok_id'])
+            jsonErr('Akses ditolak.', 403);
+
+        $filePath = __DIR__ . '/' . $up['path_file'];
+        if (!file_exists($filePath)) jsonErr('File tidak ditemukan di server.', 404);
+
+        // Tentukan MIME type
+        $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+        $mimes = [
+            'pdf'  => 'application/pdf',
+            'doc'  => 'application/msword',
+            'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'zip'  => 'application/zip',
+            'png'  => 'image/png',
+            'jpg'  => 'image/jpeg',
+            'jpeg' => 'image/jpeg',
+        ];
+        $mime = $mimes[$ext] ?? 'application/octet-stream';
+
+        // Paksa download jika pakai ?download=1, sebaliknya inline (bisa preview di browser)
+        $disposition = isset($_GET['download']) ? 'attachment' : 'inline';
+        $safeFileName = preg_replace('/[^a-zA-Z0-9._\- ]/', '_', $up['nama_file']);
+
+        header('Content-Type: ' . $mime);
+        header('Content-Disposition: ' . $disposition . '; filename="' . $safeFileName . '"');
+        header('Content-Length: ' . filesize($filePath));
+        header('Cache-Control: private, max-age=3600');
+        header('X-Content-Type-Options: nosniff');
+        // Hapus header JSON yang mungkin sudah di-set
+        header_remove('Content-Type');
+        header('Content-Type: ' . $mime);
+        readfile($filePath);
+        exit;
+
     /* ---------- PENILAIAN ---------- */
 
     case 'save_penilaian':
