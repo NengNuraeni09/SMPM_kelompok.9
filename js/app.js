@@ -638,7 +638,12 @@ function unduhFile(uploadId, namaFile) {
   var apiUrl = (typeof _smpmBase !== 'undefined' ? _smpmBase : '') + 'api.php?action=get_file&id=' + uploadId + '&download=1';
   fetch(apiUrl, { credentials: 'include' })
     .then(function(r) {
-      if (!r.ok) return r.json().then(function(j) { throw new Error(j.message || 'Gagal'); });
+      // Cek apakah response JSON error atau binary file
+      var ct = r.headers.get('Content-Type') || '';
+      if (ct.indexOf('application/json') !== -1) {
+        return r.json().then(function(j) { throw new Error(j.message || 'File tidak ditemukan'); });
+      }
+      if (!r.ok) throw new Error('Server error ' + r.status);
       return r.blob();
     })
     .then(function(blob) {
@@ -652,7 +657,18 @@ function unduhFile(uploadId, namaFile) {
       if (btn) { btn.disabled = false; btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> Unduh File'; }
     })
     .catch(function(err) {
-      showToast('Gagal mengunduh: ' + (err.message || 'Coba lagi'), 'error');
+      var msg = err.message || 'Coba lagi';
+      var isNotFound = msg.indexOf('tidak tersedia') !== -1 || msg.indexOf('tidak ditemukan') !== -1 || msg.indexOf('Upload ulang') !== -1;
+      var previewEl = document.getElementById('file-preview-' + uploadId);
+      if (isNotFound && previewEl) {
+        previewEl.innerHTML = '<div style="padding:20px;text-align:center">'
+          + '<div style="color:var(--warning);font-weight:600;margin-bottom:8px">File tidak tersedia</div>'
+          + '<div style="font-size:.83rem;color:var(--text-2);margin-bottom:12px">File ini diupload sebelum pembaruan sistem. Silakan upload ulang melalui halaman Tugas Saya.</div>'
+          + '<button class="btn btn-primary btn-sm" onclick="closeModal();showPage(\'tugas\')" style="margin:0 auto">Ke Halaman Tugas</button>'
+          + '</div>';
+      } else {
+        showToast('Gagal mengunduh: ' + msg, 'error');
+      }
       if (btn) { btn.disabled = false; btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> Unduh File'; }
     });
 }
@@ -3153,7 +3169,15 @@ function buildSidebar() {
   const footerRole = document.getElementById('sidebar-user-role');
   const avatarEl = document.getElementById('sidebar-avatar');
   if (footerEl) footerEl.textContent = currentUser.nama;
-  if (footerRole) footerRole.textContent = currentUser.role.charAt(0).toUpperCase() + currentUser.role.slice(1);
+  if (footerRole) {
+    // Untuk mahasiswa, tampilkan juga nama kelompok
+    if (currentUser.role === 'mahasiswa') {
+      const kelompok = DB.kelompok.find(k => k.id === currentUser.kelompok_id);
+      footerRole.textContent = kelompok ? kelompok.nama : 'Mahasiswa';
+    } else {
+      footerRole.textContent = currentUser.role.charAt(0).toUpperCase() + currentUser.role.slice(1);
+    }
+  }
   if (avatarEl) avatarEl.textContent = currentUser.avatar;
   const roleMenus = menus[currentUser.role] || menus.mahasiswa;
   if (navEl) {
