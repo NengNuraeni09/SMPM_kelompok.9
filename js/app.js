@@ -289,13 +289,16 @@ function renderDashboard() {
         <div class="card-title">User Terdaftar</div>
         <div class="table-wrap">
           <table class="data-table">
-            <thead><tr><th>Nama</th><th>Email</th><th>Role</th></tr></thead>
-            <tbody>${DB.users.map(u => `
-              <tr>
+            <thead><tr><th>Nama</th><th>Email</th><th>Role</th><th>Kelompok</th></tr></thead>
+            <tbody>${DB.users.map(u => {
+              const kel = u.role === 'mahasiswa' ? DB.kelompok.find(k => k.id === u.kelompok_id) : null;
+              return `<tr>
                 <td><div class="flex items-center gap-8"><div class="avatar" style="width:28px;height:28px;font-size:.7rem">${u.avatar}</div>${u.nama}</div></td>
                 <td class="text-muted text-sm">${u.email}</td>
                 <td>${roleBadge(u.role)}</td>
-              </tr>`).join('')}</tbody>
+                <td class="text-sm">${kel ? `<span class="badge badge-navy" style="font-size:.7rem">${kel.nama}</span>` : '<span class="text-muted">-</span>'}</td>
+              </tr>`;
+            }).join('')}</tbody>
           </table>
         </div>
       </div>
