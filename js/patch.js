@@ -274,8 +274,39 @@ function smpmPatchRegisterPage() {
         var el = document.getElementById(id);
         if (el) el.value = '';
       });
+      // Sembunyikan pesan error
+      var errDiv = document.getElementById('register-error');
+      if (errDiv) errDiv.classList.add('hidden');
+
+      // Set loading state di dropdown dulu
       var sel = document.getElementById('reg-kelompok');
       if (sel) {
+        sel.innerHTML = '<option value="">⏳ Memuat data kelompok...</option>';
+        sel.disabled = true;
+      }
+
+      // Fetch data FRESH dari server agar jumlah anggota akurat
+      smpmGet('get_data').then(function(res) {
+        if (!res.ok || !res.data) throw new Error('Gagal ambil data');
+
+        // Update DB lokal dengan data fresh
+        var d = res.data;
+        DB.kelompok.length = 0;
+        (d.kelompok || []).forEach(function(k) {
+          DB.kelompok.push(Object.assign({}, k, {
+            id: +k.id, dosen_id: k.dosen_id ? +k.dosen_id : null,
+            progress: +k.progress, max_anggota: +(k.max_anggota || 7)
+          }));
+        });
+        DB.users.length = 0;
+        (d.users || []).forEach(function(u) {
+          DB.users.push(Object.assign({}, u, {
+            id: +u.id, kelompok_id: u.kelompok_id ? +u.kelompok_id : null
+          }));
+        });
+
+        if (!sel) return;
+        sel.disabled = false;
         sel.innerHTML = '<option value="">— Pilih kelompok Anda —</option>' +
           DB.kelompok.filter(function(k) { return k.status === 'aktif'; })
             .map(function(k) {
@@ -284,13 +315,24 @@ function smpmPatchRegisterPage() {
               var penuh      = anggota >= maxAnggota;
               return '<option value="' + k.id + '"' + (penuh ? ' disabled' : '') + '>' +
                 k.nama + ' — ' + k.tema +
-                ' (' + anggota + '/' + maxAnggota + (penuh ? ' PENUH' : '') + ')' +
+                ' (' + anggota + '/' + maxAnggota + (penuh ? ' — PENUH' : '') + ')' +
               '</option>';
             }).join('');
-      }
-      // Sembunyikan pesan error
-      var errDiv = document.getElementById('register-error');
-      if (errDiv) errDiv.classList.add('hidden');
+      }).catch(function() {
+        // Fallback ke data lokal kalau fetch gagal
+        if (!sel) return;
+        sel.disabled = false;
+        sel.innerHTML = '<option value="">— Pilih kelompok Anda —</option>' +
+          DB.kelompok.filter(function(k) { return k.status === 'aktif'; })
+            .map(function(k) {
+              var anggota    = DB.users.filter(function(u) { return +u.kelompok_id === +k.id && u.role === 'mahasiswa'; }).length;
+              var maxAnggota = k.max_anggota || 7;
+              var penuh      = anggota >= maxAnggota;
+              return '<option value="' + k.id + '"' + (penuh ? ' disabled' : '') + '>' +
+                k.nama + ' (' + anggota + '/' + maxAnggota + (penuh ? ' — PENUH' : '') + ')' +
+              '</option>';
+            }).join('');
+      });
     };
     window.showRegisterPage._smpmPatched = true;
   }
