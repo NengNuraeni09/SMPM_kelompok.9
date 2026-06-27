@@ -262,6 +262,16 @@ switch ($action) {
         $newId = (int) db()->lastInsertId();
         db()->prepare('UPDATE tugas SET status=? WHERE id=?')->execute(['selesai',$tugasId]);
 
+        // Update progress kelompok otomatis berdasarkan % tugas selesai
+        $cntT2 = db()->prepare('SELECT COUNT(*) as cnt FROM tugas WHERE kelompok_id=?');
+        $cntT2->execute([(int)$user['kelompok_id']]);
+        $totalT = (int)($cntT2->fetch()['cnt'] ?? 0);
+        $cntS2 = db()->prepare("SELECT COUNT(*) as cnt FROM tugas WHERE kelompok_id=? AND status='selesai'");
+        $cntS2->execute([(int)$user['kelompok_id']]);
+        $selesaiT = (int)($cntS2->fetch()['cnt'] ?? 0);
+        $newProgress = $totalT > 0 ? (int)round($selesaiT / $totalT * 100) : 0;
+        db()->prepare('UPDATE kelompok SET progress=? WHERE id=?')->execute([$newProgress, (int)$user['kelompok_id']]);
+
         $row = db()->prepare('SELECT id,nama_file,path_file,ukuran,tipe,kelompok_id,user_id,tugas_id,uploaded_at FROM uploads WHERE id=?');
         $row->execute([$newId]);
         $up = $row->fetch();
@@ -352,13 +362,33 @@ switch ($action) {
         $nilai      = (int)($_POST['nilai'] ?? 0);
         $feedback   = trim($_POST['feedback'] ?? '');
         if (!$kelompokId) jsonErr('Kelompok tidak valid.');
+
+        // Simpan penilaian
         $stmt = db()->prepare(
             'INSERT INTO penilaian (kelompok_id,dosen_id,nilai,feedback)
              VALUES (?,?,?,?)
              ON DUPLICATE KEY UPDATE nilai=VALUES(nilai), feedback=VALUES(feedback), updated_at=NOW()'
         );
         $stmt->execute([$kelompokId, (int)$_SESSION['user']['id'], $nilai, $feedback]);
-        jsonOk();
+
+        // Hitung progress otomatis dari % tugas selesai
+        $totalTugas = (int) db()->prepare('SELECT COUNT(*) FROM tugas WHERE kelompok_id=?')
+            ->query("SELECT COUNT(*) FROM tugas WHERE kelompok_id=$kelompokId")->fetchColumn();
+        $cntT = db()->prepare('SELECT COUNT(*) as cnt FROM tugas WHERE kelompok_id=?');
+        $cntT->execute([$kelompokId]);
+        $totalTugas = (int)($cntT->fetch()['cnt'] ?? 0);
+
+        $cntS = db()->prepare("SELECT COUNT(*) as cnt FROM tugas WHERE kelompok_id=? AND status='selesai'");
+        $cntS->execute([$kelompokId]);
+        $selesai = (int)($cntS->fetch()['cnt'] ?? 0);
+
+        // Progress = % tugas selesai, minimal sama dengan nilai/100*progress lama
+        $progress = $totalTugas > 0 ? (int)round($selesai / $totalTugas * 100) : 0;
+
+        // Update progress di tabel kelompok
+        db()->prepare('UPDATE kelompok SET progress=? WHERE id=?')->execute([$progress, $kelompokId]);
+
+        jsonOk(['progress' => $progress]);
 
     /* ---------- ADMIN: USER ---------- */
 
