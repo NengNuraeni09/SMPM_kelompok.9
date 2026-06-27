@@ -372,8 +372,6 @@ switch ($action) {
         $stmt->execute([$kelompokId, (int)$_SESSION['user']['id'], $nilai, $feedback]);
 
         // Hitung progress otomatis dari % tugas selesai
-        $totalTugas = (int) db()->prepare('SELECT COUNT(*) FROM tugas WHERE kelompok_id=?')
-            ->query("SELECT COUNT(*) FROM tugas WHERE kelompok_id=$kelompokId")->fetchColumn();
         $cntT = db()->prepare('SELECT COUNT(*) as cnt FROM tugas WHERE kelompok_id=?');
         $cntT->execute([$kelompokId]);
         $totalTugas = (int)($cntT->fetch()['cnt'] ?? 0);
@@ -382,10 +380,7 @@ switch ($action) {
         $cntS->execute([$kelompokId]);
         $selesai = (int)($cntS->fetch()['cnt'] ?? 0);
 
-        // Progress = % tugas selesai, minimal sama dengan nilai/100*progress lama
         $progress = $totalTugas > 0 ? (int)round($selesai / $totalTugas * 100) : 0;
-
-        // Update progress di tabel kelompok
         db()->prepare('UPDATE kelompok SET progress=? WHERE id=?')->execute([$progress, $kelompokId]);
 
         jsonOk(['progress' => $progress]);
