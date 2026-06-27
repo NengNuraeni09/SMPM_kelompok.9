@@ -333,17 +333,15 @@ function smpmPatchRegisterPage() {
         if (penuhList.length > 0) {
           html += '<optgroup label="🔒 Penuh (tidak bisa dipilih)">' +
             penuhList.map(function(k) {
-              return '<option value="' + k.id + '" disabled>' + k.nama + ' – ' + k.tema + ' (Penuh)</option>';
+              return '<option value="kelompok_penuh_' + k.id + '">' + k.nama + ' – ' + k.tema + ' (Penuh)</option>';
             }).join('') + '</optgroup>';
         }
         sel.innerHTML = html;
 
-        // Validasi tambahan saat user coba pilih kelompok penuh
+        // Cegah pilih kelompok penuh — reset ke kosong kalau value mengandung "kelompok_penuh_"
         sel.addEventListener('change', function() {
-          var selectedId = +sel.value;
-          var kel = DB.kelompok.find(function(k) { return +k.id === selectedId; });
-          if (kel && +(kel.jumlah_anggota || 0) >= +(kel.max_anggota || 7)) {
-            showToast('Kelompok ini sudah penuh, pilih kelompok lain!', 'error');
+          if (sel.value && sel.value.indexOf('kelompok_penuh_') === 0) {
+            showToast('Kelompok ini sudah penuh! Silakan pilih kelompok lain.', 'error');
             sel.value = '';
           }
         });
@@ -370,10 +368,16 @@ function smpmPatchRegisterPage() {
         if (penuhList.length > 0) {
           html += '<optgroup label="🔒 Penuh (tidak bisa dipilih)">' +
             penuhList.map(function(k) {
-              return '<option value="' + k.id + '" disabled>' + k.nama + ' – ' + k.tema + ' (Penuh)</option>';
+              return '<option value="kelompok_penuh_' + k.id + '">' + k.nama + ' – ' + k.tema + ' (Penuh)</option>';
             }).join('') + '</optgroup>';
         }
         sel.innerHTML = html;
+        sel.addEventListener('change', function() {
+          if (sel.value && sel.value.indexOf('kelompok_penuh_') === 0) {
+            showToast('Kelompok ini sudah penuh! Silakan pilih kelompok lain.', 'error');
+            sel.value = '';
+          }
+        });
       });
     };
     window.showRegisterPage._smpmPatched = true;
@@ -536,7 +540,10 @@ function smpmHandleRegister() {
   if (password.length < 6)              return showErr('Password minimal 6 karakter!');
   if (password !== confirmPass)         return showErr('Konfirmasi password tidak cocok!');
 
-  // Validasi kelompok tidak penuh (double-check di frontend)
+  // Validasi kelompok tidak penuh
+  if (kelompokId.indexOf('kelompok_penuh_') === 0) {
+    return showErr('Kelompok ini sudah penuh! Pilih kelompok lain.');
+  }
   var kelData = DB.kelompok.find(function(k) { return +k.id === +kelompokId; });
   if (kelData) {
     var jmlAnggota = +(kelData.jumlah_anggota || 0) ||
