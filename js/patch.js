@@ -315,27 +315,65 @@ function smpmPatchRegisterPage() {
 
         if (!sel) return;
         sel.disabled = false;
-        sel.innerHTML = '<option value="">— Pilih kelompok Anda —</option>' +
-          DB.kelompok.filter(function(k) { return k.status === 'aktif'; })
-            .map(function(k) {
-              var anggota    = k.jumlah_anggota;
-              var maxAnggota = k.max_anggota || 7;
-              var penuh      = anggota >= maxAnggota;
-              var label      = k.nama + ' – ' + k.tema + (penuh ? ' (Penuh)' : '');
-              return '<option value="' + k.id + '"' + (penuh ? ' disabled' : '') + '>' + label + '</option>';
-            }).join('');
+
+        var tersedia = DB.kelompok.filter(function(k) {
+          return k.status === 'aktif' && +(k.jumlah_anggota || 0) < +(k.max_anggota || 7);
+        });
+        var penuhList = DB.kelompok.filter(function(k) {
+          return k.status === 'aktif' && +(k.jumlah_anggota || 0) >= +(k.max_anggota || 7);
+        });
+
+        var html = '<option value="">— Pilih kelompok Anda —</option>';
+        if (tersedia.length > 0) {
+          html += '<optgroup label="✅ Tersedia">' +
+            tersedia.map(function(k) {
+              return '<option value="' + k.id + '">' + k.nama + ' – ' + k.tema + '</option>';
+            }).join('') + '</optgroup>';
+        }
+        if (penuhList.length > 0) {
+          html += '<optgroup label="🔒 Penuh (tidak bisa dipilih)">' +
+            penuhList.map(function(k) {
+              return '<option value="' + k.id + '" disabled>' + k.nama + ' – ' + k.tema + ' (Penuh)</option>';
+            }).join('') + '</optgroup>';
+        }
+        sel.innerHTML = html;
+
+        // Validasi tambahan saat user coba pilih kelompok penuh
+        sel.addEventListener('change', function() {
+          var selectedId = +sel.value;
+          var kel = DB.kelompok.find(function(k) { return +k.id === selectedId; });
+          if (kel && +(kel.jumlah_anggota || 0) >= +(kel.max_anggota || 7)) {
+            showToast('Kelompok ini sudah penuh, pilih kelompok lain!', 'error');
+            sel.value = '';
+          }
+        });
+
       }).catch(function() {
         if (!sel) return;
         sel.disabled = false;
-        sel.innerHTML = '<option value="">— Pilih kelompok Anda —</option>' +
-          DB.kelompok.filter(function(k) { return k.status === 'aktif'; })
-            .map(function(k) {
-              var anggota    = DB.users.filter(function(u) { return +u.kelompok_id === +k.id && u.role === 'mahasiswa'; }).length;
-              var maxAnggota = k.max_anggota || 7;
-              var penuh      = anggota >= maxAnggota;
-              var label      = k.nama + ' – ' + k.tema + (penuh ? ' (Penuh)' : '');
-              return '<option value="' + k.id + '"' + (penuh ? ' disabled' : '') + '>' + label + '</option>';
-            }).join('');
+        var allKel = DB.kelompok.filter(function(k) { return k.status === 'aktif'; });
+        var tersedia = allKel.filter(function(k) {
+          var cnt = DB.users.filter(function(u) { return +u.kelompok_id === +k.id && u.role === 'mahasiswa'; }).length;
+          return cnt < +(k.max_anggota || 7);
+        });
+        var penuhList = allKel.filter(function(k) {
+          var cnt = DB.users.filter(function(u) { return +u.kelompok_id === +k.id && u.role === 'mahasiswa'; }).length;
+          return cnt >= +(k.max_anggota || 7);
+        });
+        var html = '<option value="">— Pilih kelompok Anda —</option>';
+        if (tersedia.length > 0) {
+          html += '<optgroup label="✅ Tersedia">' +
+            tersedia.map(function(k) {
+              return '<option value="' + k.id + '">' + k.nama + ' – ' + k.tema + '</option>';
+            }).join('') + '</optgroup>';
+        }
+        if (penuhList.length > 0) {
+          html += '<optgroup label="🔒 Penuh (tidak bisa dipilih)">' +
+            penuhList.map(function(k) {
+              return '<option value="' + k.id + '" disabled>' + k.nama + ' – ' + k.tema + ' (Penuh)</option>';
+            }).join('') + '</optgroup>';
+        }
+        sel.innerHTML = html;
       });
     };
     window.showRegisterPage._smpmPatched = true;
@@ -497,6 +535,16 @@ function smpmHandleRegister() {
   if (!email.includes('@kampus.ac.id'))  return showErr('Email harus menggunakan @kampus.ac.id!');
   if (password.length < 6)              return showErr('Password minimal 6 karakter!');
   if (password !== confirmPass)         return showErr('Konfirmasi password tidak cocok!');
+
+  // Validasi kelompok tidak penuh (double-check di frontend)
+  var kelData = DB.kelompok.find(function(k) { return +k.id === +kelompokId; });
+  if (kelData) {
+    var jmlAnggota = +(kelData.jumlah_anggota || 0) ||
+      DB.users.filter(function(u) { return +u.kelompok_id === +kelompokId && u.role === 'mahasiswa'; }).length;
+    if (jmlAnggota >= +(kelData.max_anggota || 7)) {
+      return showErr('Kelompok ini sudah penuh! Pilih kelompok lain.');
+    }
+  }
 
   var btn = document.querySelector('.reg-submit-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Mendaftar...'; }
