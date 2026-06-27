@@ -1,18 +1,24 @@
 <?php
 /* =============================================
    SMPM — Auto Migration
-   Dipanggil dari index.php setiap request,
-   hanya eksekusi jika tabel belum ada.
-   ============================================= */
+ ============================================= */
 
 function runMigrations(PDO $pdo): void {
     // Selalu cek dan tambah kolom file_data jika belum ada
-    // (untuk DB yang sudah berjalan tanpa kolom ini)
     try {
         $pdo->query('SELECT file_data FROM uploads LIMIT 1');
     } catch (PDOException $e) {
         try {
             $pdo->exec('ALTER TABLE uploads ADD COLUMN file_data LONGBLOB DEFAULT NULL AFTER path_file');
+        } catch (PDOException $e2) { /* tabel belum ada */ }
+    }
+
+    // Tambah kolom max_anggota jika belum ada (untuk DB yang sudah berjalan)
+    try {
+        $pdo->query('SELECT max_anggota FROM kelompok LIMIT 1');
+    } catch (PDOException $e) {
+        try {
+            $pdo->exec('ALTER TABLE kelompok ADD COLUMN max_anggota TINYINT UNSIGNED NOT NULL DEFAULT 7 AFTER status');
         } catch (PDOException $e2) { /* tabel belum ada, akan dibuat di bawah */ }
     }
 
@@ -48,6 +54,7 @@ function runMigrations(PDO $pdo): void {
         dosen_id    INT UNSIGNED  DEFAULT NULL,
         progress    TINYINT UNSIGNED DEFAULT 0,
         status      ENUM('aktif','nonaktif','selesai') DEFAULT 'aktif',
+        max_anggota TINYINT UNSIGNED NOT NULL DEFAULT 7,
         created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");

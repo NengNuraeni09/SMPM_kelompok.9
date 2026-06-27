@@ -126,7 +126,7 @@ function smpmLoadDB() {
       DB.users.push(Object.assign({}, u, { id: +u.id, kelompok_id: u.kelompok_id ? +u.kelompok_id : null }));
     });
     (d.kelompok || []).forEach(function(k) {
-      DB.kelompok.push(Object.assign({}, k, { id: +k.id, dosen_id: k.dosen_id ? +k.dosen_id : null, progress: +k.progress, max_anggota: +(k.max_anggota || 5) }));
+      DB.kelompok.push(Object.assign({}, k, { id: +k.id, dosen_id: k.dosen_id ? +k.dosen_id : null, progress: +k.progress, max_anggota: +(k.max_anggota || 7) }));
     });
     (d.tugas || []).forEach(function(t) {
       DB.tugas.push(Object.assign({}, t, { id: +t.id, kelompok_id: +t.kelompok_id, assignee: t.assignee_id ? +t.assignee_id : null, assignee_id: t.assignee_id ? +t.assignee_id : null, file: null }));
@@ -278,8 +278,15 @@ function smpmPatchRegisterPage() {
       if (sel) {
         sel.innerHTML = '<option value="">— Pilih kelompok Anda —</option>' +
           DB.kelompok.filter(function(k) { return k.status === 'aktif'; })
-            .map(function(k) { return '<option value="' + k.id + '">' + k.nama + ' — ' + k.tema + '</option>'; })
-            .join('');
+            .map(function(k) {
+              var anggota    = DB.users.filter(function(u) { return +u.kelompok_id === +k.id && u.role === 'mahasiswa'; }).length;
+              var maxAnggota = k.max_anggota || 7;
+              var penuh      = anggota >= maxAnggota;
+              return '<option value="' + k.id + '"' + (penuh ? ' disabled' : '') + '>' +
+                k.nama + ' — ' + k.tema +
+                ' (' + anggota + '/' + maxAnggota + (penuh ? ' PENUH' : '') + ')' +
+              '</option>';
+            }).join('');
       }
       // Sembunyikan pesan error
       var errDiv = document.getElementById('register-error');
@@ -1012,3 +1019,66 @@ window.renderTugasRows = function(kelompokId) {
     '</tr>';
   }).join('');
 };
+
+/* ============================================================
+   KAPASITAS KELOMPOK — tampilkan X/7 di dashboard & monitoring
+   ============================================================ */
+
+// Helper: hitung anggota kelompok
+function smpmAnggotaCount(kelompokId) {
+  return DB.users.filter(function(u) { return +u.kelompok_id === +kelompokId && u.role === 'mahasiswa'; }).length;
+}
+
+// Override renderDashboard agar tampil info anggota X/7
+(function() {
+  var _orig = window.renderDashboard;
+  window.renderDashboard = function() {
+    if (_orig) _orig();
+
+    // Patch tabel kelompok di dashboard dosen & admin — tambah kolom anggota
+    setTimeout(function() {
+      // Cari semua tabel yang punya header "Kelompok" dan "Progress"
+      document.querySelectorAll('.data-table').forEach(function(tbl) {
+        var headers = tbl.querySelectorAll('thead th');
+        var hasKelompok = false, hasProgress = false, hasAnggota = false;
+        headers.forEach(function(th) {
+          if (th.textContent.trim() === 'Kelompok') hasKelompok = true;
+          if (th.textContent.trim() === 'Progress')  hasProgress = true;
+          if (th.textContent.trim() === 'Anggota')   hasAnggota = true;
+        });
+        if (hasKelompok && hasProgress && !hasAnggota) {
+          // Tambah header "Anggota" setelah "Progress"
+          headers.forEach(function(th, i) {
+            if (th.textContent.trim() === 'Progress') {
+              var newTh = document.createElement('th');
+              newTh.textContent = 'Anggota';
+              th.parentNode.insertBefore(newTh, th.nextSibling);
+            }
+          });
+          // Tambah cell di setiap baris
+          tbl.querySelectorAll('tbody tr').forEach(function(tr) {
+            var cells = tr.querySelectorAll('td');
+            // Cari index kolom progress (biasanya ke-3, index 2)
+            var insertAfter = null;
+            cells.forEach(function(td, i) {
+              if (td.querySelector('.progress-wrap')) insertAfter = td;
+            });
+            if (insertAfter) {
+              // Cari kelompok dari nama di kolom pertama
+              var namaKel = (tr.querySelector('td strong') || tr.querySelector('td')).textContent.trim();
+              var kel = DB.kelompok.find(function(k) { return k.nama === namaKel; });
+              var cnt = kel ? smpmAnggotaCount(kel.id) : 0;
+              var max = kel ? (kel.max_anggota || 7) : 7;
+              var penuh = cnt >= max;
+              var td = document.createElement('td');
+              td.innerHTML = '<span style="font-size:.82rem;font-weight:700;color:' +
+                (penuh ? 'var(--success)' : 'var(--accent)') + '">' + cnt + '/' + max + '</span>' +
+                (penuh ? '<span class="badge badge-green" style="font-size:.65rem;margin-left:4px">Penuh</span>' : '');
+              insertAfter.parentNode.insertBefore(td, insertAfter.nextSibling);
+            }
+          });
+        }
+      });
+    }, 100);
+  };
+})();

@@ -127,6 +127,19 @@ switch ($action) {
         $chk->execute([$email]);
         if ($chk->fetch()) jsonErr('Email sudah terdaftar.');
 
+        // Cek kapasitas kelompok (maks 7 anggota)
+        if ($kelompokId) {
+            $kelStmt = db()->prepare('SELECT max_anggota FROM kelompok WHERE id=? LIMIT 1');
+            $kelStmt->execute([$kelompokId]);
+            $kelData    = $kelStmt->fetch();
+            $maxAnggota = $kelData ? (int)($kelData['max_anggota'] ?? 7) : 7;
+            $cntStmt    = db()->prepare('SELECT COUNT(*) as cnt FROM users WHERE kelompok_id=? AND role=?');
+            $cntStmt->execute([$kelompokId, 'mahasiswa']);
+            $cntAnggota = (int)($cntStmt->fetch()['cnt'] ?? 0);
+            if ($cntAnggota >= $maxAnggota)
+                jsonErr("Kelompok ini sudah penuh ($cntAnggota/$maxAnggota anggota). Pilih kelompok lain.");
+        }
+
         $avatar = strtoupper(mb_substr($nama, 0, 1)) . strtoupper(mb_substr(explode(' ', $nama)[1] ?? $nim, 0, 1));
         $hash   = password_hash($password, PASSWORD_BCRYPT);
         $ins = db()->prepare('INSERT INTO users (nama,nim,email,password,role,avatar,kelompok_id) VALUES (?,?,?,?,?,?,?)');
@@ -359,6 +372,18 @@ switch ($action) {
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) jsonErr('Format email tidak valid.');
         $chk = db()->prepare('SELECT id FROM users WHERE email=?'); $chk->execute([$email]);
         if ($chk->fetch()) jsonErr('Email sudah terdaftar.');
+        // Cek kapasitas kelompok jika mahasiswa
+        if ($role === 'mahasiswa' && $kelompokId) {
+            $kelStmt = db()->prepare('SELECT max_anggota FROM kelompok WHERE id=? LIMIT 1');
+            $kelStmt->execute([$kelompokId]);
+            $kelData    = $kelStmt->fetch();
+            $maxAnggota = $kelData ? (int)($kelData['max_anggota'] ?? 7) : 7;
+            $cntStmt    = db()->prepare('SELECT COUNT(*) as cnt FROM users WHERE kelompok_id=? AND role=?');
+            $cntStmt->execute([$kelompokId, 'mahasiswa']);
+            $cntAnggota = (int)($cntStmt->fetch()['cnt'] ?? 0);
+            if ($cntAnggota >= $maxAnggota)
+                jsonErr("Kelompok ini sudah penuh ($cntAnggota/$maxAnggota anggota).");
+        }
         $avatar = strtoupper(mb_substr($nama,0,1)).strtoupper(mb_substr(explode(' ',$nama)[1] ?? $nim,0,1));
         $ins = db()->prepare('INSERT INTO users (nama,nim,email,password,role,avatar,kelompok_id) VALUES (?,?,?,?,?,?,?)');
         $ins->execute([$nama,$nim,$email,password_hash($password,PASSWORD_BCRYPT),$role,$avatar,$kelompokId]);
