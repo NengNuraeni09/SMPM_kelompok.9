@@ -158,6 +158,13 @@ switch ($action) {
         requireLogin();
         $user = $_SESSION['user'];
 
+        // Auto-update status tugas yang melewati deadline jadi 'terlambat'
+        db()->exec(
+            "UPDATE tugas SET status='terlambat'
+             WHERE status IN ('pending','proses')
+             AND deadline < CURDATE()"
+        );
+
         // Ambil semua data yang dibutuhkan frontend sesuai role
         $kelompok   = db()->query('SELECT k.*,u.nama AS dosen_nama,
             (SELECT COUNT(*) FROM users WHERE kelompok_id=k.id AND role=\'mahasiswa\') AS jumlah_anggota
