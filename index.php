@@ -25,8 +25,10 @@ try { runMigrations(Database::getConnection()); } catch (Throwable $e) { error_l
 // Dengan begitu user yang belum login selalu diarahkan ke halaman login.
 $html = file_get_contents(__DIR__ . '/app.html');
 
-// Cache-busting: tambahkan versi berdasarkan waktu modifikasi file
-$ver = filemtime(__DIR__ . '/app.html') ?: time();
+// Cache-busting pakai MD5 isi file — berubah setiap kali file dimodifikasi
+$ver    = substr(md5_file(__DIR__ . '/js/patch.js')  ?: uniqid(), 0, 8)
+        . substr(md5_file(__DIR__ . '/js/app.js')    ?: uniqid(), 0, 8);
+$cssVer = substr(md5_file(__DIR__ . '/css/style.css') ?: uniqid(), 0, 8);
 
 // Sisipkan patch.js setelah app.js dengan versi cache-busting
 $html = str_replace(
@@ -37,7 +39,6 @@ $html = str_replace(
 );
 
 // Cache-busting untuk CSS
-$cssVer = filemtime(__DIR__ . '/css/style.css') ?: time();
 $html = str_replace(
     '<link rel="stylesheet" href="css/style.css" />',
     '<link rel="stylesheet" href="css/style.css?v=' . $cssVer . '" />',

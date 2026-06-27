@@ -318,16 +318,13 @@ function smpmPatchRegisterPage() {
         sel.innerHTML = '<option value="">— Pilih kelompok Anda —</option>' +
           DB.kelompok.filter(function(k) { return k.status === 'aktif'; })
             .map(function(k) {
-              var anggota    = k.jumlah_anggota;   // pakai data langsung dari server
+              var anggota    = k.jumlah_anggota;
               var maxAnggota = k.max_anggota || 7;
               var penuh      = anggota >= maxAnggota;
-              return '<option value="' + k.id + '"' + (penuh ? ' disabled style="color:#aaa;background:#f5f5f5"' : '') + '>' +
-                k.nama + ' — ' + k.tema +
-                ' (' + anggota + '/' + maxAnggota + (penuh ? ' — PENUH 🔒' : '') + ')' +
-              '</option>';
+              var label      = k.nama + ' – ' + k.tema + (penuh ? ' [PENUH ' + anggota + '/' + maxAnggota + ']' : ' [' + anggota + '/' + maxAnggota + ' anggota]');
+              return '<option value="' + k.id + '"' + (penuh ? ' disabled' : '') + '>' + label + '</option>';
             }).join('');
       }).catch(function() {
-        // Fallback ke data lokal kalau fetch gagal
         if (!sel) return;
         sel.disabled = false;
         sel.innerHTML = '<option value="">— Pilih kelompok Anda —</option>' +
@@ -336,9 +333,8 @@ function smpmPatchRegisterPage() {
               var anggota    = DB.users.filter(function(u) { return +u.kelompok_id === +k.id && u.role === 'mahasiswa'; }).length;
               var maxAnggota = k.max_anggota || 7;
               var penuh      = anggota >= maxAnggota;
-              return '<option value="' + k.id + '"' + (penuh ? ' disabled style="color:#aaa;background:#f5f5f5"' : '') + '>' +
-                k.nama + ' (' + anggota + '/' + maxAnggota + (penuh ? ' — PENUH 🔒' : '') + ')' +
-              '</option>';
+              var label      = k.nama + ' – ' + k.tema + (penuh ? ' [PENUH ' + anggota + '/' + maxAnggota + ']' : ' [' + anggota + '/' + maxAnggota + ' anggota]');
+              return '<option value="' + k.id + '"' + (penuh ? ' disabled' : '') + '>' + label + '</option>';
             }).join('');
       });
     };
