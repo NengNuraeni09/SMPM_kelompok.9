@@ -793,3 +793,210 @@ window.hapusUpload = function(uploadId) {
   overlay.classList.remove('hidden');
 };
 
+
+/* ============================================================
+   TUGAS KELOMPOK — override konsep tugas kelompok (bukan per-orang)
+   - showTambahTugasModal: hapus dropdown assignee, tampil anggota otomatis
+   - submitTambahTugas: kirim tanpa assignee_id (tugas milik seluruh kelompok)
+   - renderTugas (mahasiswa): tampilkan semua tugas kelompok, bukan per-assignee
+   - renderTugasDosen: kolom "Assignee" → "Anggota Kelompok"
+   ============================================================ */
+
+// Override showTambahTugasModal: tanpa dropdown assignee
+window.showTambahTugasModal = function(kelompokId) {
+  var kelompok = DB.kelompok.find(function(k) { return +k.id === +kelompokId; });
+  var anggota  = DB.users.filter(function(u) { return +u.kelompok_id === +kelompokId && u.role === 'mahasiswa'; });
+  var overlay  = document.getElementById('modal-overlay');
+  var body     = document.getElementById('modal-body');
+  if (!overlay || !body) return;
+
+  var today = new Date().toISOString().split('T')[0];
+
+  var anggotaHtml = anggota.length > 0
+    ? anggota.map(function(a) {
+        return '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border)">' +
+          '<div class="avatar" style="width:26px;height:26px;font-size:.65rem">' + a.avatar + '</div>' +
+          '<span style="font-size:.85rem;font-weight:600">' + a.nama + '</span>' +
+          '<span style="font-size:.75rem;color:var(--text-3)">(' + a.nim + ')</span>' +
+        '</div>';
+      }).join('')
+    : '<div style="font-size:.82rem;color:var(--text-3);font-style:italic">Belum ada anggota di kelompok ini</div>';
+
+  body.innerHTML =
+    '<div class="modal-header">' +
+      '<div class="modal-title">Tambah Tugas — ' + (kelompok ? kelompok.nama : '') + '</div>' +
+      '<button class="modal-close" onclick="closeModal()">&times;</button>' +
+    '</div>' +
+    '<div style="display:flex;flex-direction:column;gap:14px">' +
+      '<div class="form-group">' +
+        '<label class="form-label">Judul Tugas <span style="color:var(--danger)">*</span></label>' +
+        '<input class="form-control" id="tt-judul" placeholder="Contoh: Buat ERD Database" />' +
+      '</div>' +
+      '<div class="form-group">' +
+        '<label class="form-label">Ditugaskan ke Seluruh Anggota</label>' +
+        '<div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">' + anggotaHtml + '</div>' +
+      '</div>' +
+      '<div class="form-group">' +
+        '<label class="form-label">Deadline <span style="color:var(--danger)">*</span></label>' +
+        '<input class="form-control" id="tt-deadline" type="date" min="' + today + '" value="' + today + '" />' +
+      '</div>' +
+      '<div class="form-group">' +
+        '<label class="form-label">Status Awal</label>' +
+        '<select class="form-control" id="tt-status">' +
+          '<option value="pending">Pending</option>' +
+          '<option value="proses">Proses</option>' +
+        '</select>' +
+      '</div>' +
+      '<div class="form-group">' +
+        '<label class="form-label">Deskripsi / Catatan</label>' +
+        '<textarea class="form-control" id="tt-desc" rows="3" placeholder="Instruksi tambahan untuk kelompok..." style="resize:vertical"></textarea>' +
+      '</div>' +
+      '<button class="btn btn-primary w-full" onclick="submitTambahTugas(' + kelompokId + ')" style="justify-content:center;padding:12px;margin-top:4px">' +
+        '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:6px"><path d="M12 5v14M5 12h14"/></svg>' +
+        'Simpan Tugas untuk Kelompok' +
+      '</button>' +
+    '</div>';
+
+  overlay.classList.remove('hidden');
+};
+
+// Override submitTambahTugas: kirim ke server tanpa assignee_id
+window.submitTambahTugas = function(kelompokId) {
+  var judul    = (document.getElementById('tt-judul')    || {}).value || '';
+  judul = judul.trim();
+  var deadline = (document.getElementById('tt-deadline') || {}).value || '';
+  var status   = (document.getElementById('tt-status')   || {}).value || 'pending';
+  var deskripsi= ((document.getElementById('tt-desc')    || {}).value || '').trim();
+
+  if (!judul)    { showToast('Judul tugas wajib diisi!', 'error'); return; }
+  if (!deadline) { showToast('Deadline wajib diisi!', 'error'); return; }
+
+  var btn = document.querySelector('#modal-body .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Menyimpan...'; }
+
+  smpmPost('add_tugas', {
+    judul:       judul,
+    kelompok_id: kelompokId,
+    assignee_id: '',   // kosong = tugas kelompok, semua anggota
+    deadline:    deadline,
+    status:      status,
+    deskripsi:   deskripsi
+  }).then(function(res) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Simpan Tugas untuk Kelompok'; }
+    if (!res.ok) { showToast(res.message || 'Gagal tambah tugas.', 'error'); return; }
+    smpmLoadDB().then(function() { closeModal(); renderTugasDosen(); showToast('Tugas berhasil ditambahkan untuk seluruh kelompok!', 'success'); });
+  }).catch(function(err) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Simpan Tugas untuk Kelompok'; }
+    smpmHandleError(err);
+  });
+};
+
+// Override renderTugas untuk mahasiswa: tampilkan semua tugas kelompok (bukan per-assignee)
+(function() {
+  var _origRenderTugas = window.renderTugas;
+  window.renderTugas = function() {
+    if (!currentUser || currentUser.role !== 'mahasiswa') {
+      if (_origRenderTugas) _origRenderTugas();
+      return;
+    }
+    // Tampilkan SEMUA tugas kelompok, bukan filter per assignee
+    var myTugas = DB.tugas.filter(function(t) { return +t.kelompok_id === +currentUser.kelompok_id; });
+    var container = document.getElementById('tugas-list');
+    if (!container) return;
+
+    var html = '<div class="mb-16" style="display:flex;gap:12px;justify-content:flex-end">';
+    html += '<button class="btn btn-primary" onclick="exportTugasAsPDF()" style="display:flex;align-items:center;gap:8px">';
+    html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 9H5a2 2 0 00-2 2v6a2 2 0 002 2h14a2 2 0 002-2v-6a2 2 0 00-2-2zm-5 6H7m5 0v3m0-3H9m5-2v-2"/></svg>';
+    html += 'Export PDF</button></div>';
+
+    if (myTugas.length === 0) {
+      html += '<div class="empty-state"><p>Belum ada tugas untuk kelompok ini</p></div>';
+      container.innerHTML = html;
+      return;
+    }
+
+    html += myTugas.map(function(t) {
+      var myUploads = DB.uploads.filter(function(u) { return +u.tugas_id === +t.id; });
+      return '<div class="card mb-8" style="border-left:4px solid ' + statusColor(t.status) + '">' +
+        '<div class="flex justify-between items-center" style="flex-wrap:wrap;gap:10px">' +
+          '<div style="flex:1;min-width:180px">' +
+            '<div class="font-600">' + t.judul + '</div>' +
+            '<div class="text-sm text-muted mt-4">Deadline: ' + formatDate(t.deadline) + '</div>' +
+            (t.submitted_at ? '<div class="text-sm mt-4" style="color:var(--success)">&#x2713; Dikumpulkan: ' + formatDate(t.submitted_at) + '</div>' : '') +
+          '</div>' +
+          '<div class="flex gap-8 items-center" style="flex-wrap:wrap">' +
+            statusBadge(t.status) +
+            myUploads.map(function(u) {
+              return '<span class="badge badge-navy" style="cursor:pointer;font-size:.72rem" onclick="lihatFileTugas(' + u.id + ')" title="Klik untuk lihat file"> ' + u.nama_file + '</span>';
+            }).join('') +
+            (t.status !== 'selesai'
+              ? '<button class="btn btn-sm btn-success" onclick="showKumpulkanModal(' + t.id + ')" style="display:flex;align-items:center;gap:5px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>Kumpulkan</button>'
+              : '<button class="btn btn-sm btn-outline" onclick="showKumpulkanModal(' + t.id + ')" style="font-size:.75rem;display:flex;align-items:center;gap:5px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>Upload Lagi</button>') +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+
+    container.innerHTML = html;
+  };
+})();
+
+// Override upload-tugas dropdown: tampilkan semua tugas kelompok (bukan per-assignee)
+(function() {
+  var _origRenderUpload = window.renderUpload;
+  window.renderUpload = function() {
+    // Patch dropdown tugas agar tampilkan semua tugas kelompok
+    var origFn = _origRenderUpload || function(){};
+    origFn();
+    // Re-populate dropdown setelah render
+    var tugasSelect = document.getElementById('upload-tugas');
+    if (tugasSelect && currentUser && currentUser.role === 'mahasiswa') {
+      var myTugas = DB.tugas.filter(function(t) {
+        return +t.kelompok_id === +currentUser.kelompok_id && t.status !== 'selesai';
+      });
+      tugasSelect.innerHTML = '<option value="">-- Pilih Tugas yang Ingin Diupload --</option>' +
+        myTugas.map(function(t) {
+          return '<option value="' + t.id + '">' + t.judul + ' (Deadline: ' + formatDate(t.deadline) + ')</option>';
+        }).join('');
+    }
+  };
+})();
+
+// Override renderTugasRows: kolom "Assignee" → tampilkan semua anggota kelompok
+window.renderTugasRows = function(kelompokId) {
+  var tugasList = DB.tugas.filter(function(t) { return +t.kelompok_id === +kelompokId; });
+  if (tugasList.length === 0) return '<tr><td colspan="6" style="text-align:center;color:var(--text-3)">Belum ada tugas</td></tr>';
+
+  var anggota = DB.users.filter(function(u) { return +u.kelompok_id === +kelompokId && u.role === 'mahasiswa'; });
+  var anggotaHtml = anggota.length > 0
+    ? anggota.map(function(a) {
+        return '<div class="flex items-center gap-6" style="margin-bottom:3px">' +
+          '<div class="avatar" style="width:20px;height:20px;font-size:.55rem">' + a.avatar + '</div>' +
+          '<span class="text-sm">' + a.nama + '</span>' +
+        '</div>';
+      }).join('')
+    : '<span class="text-muted text-sm">—</span>';
+
+  return tugasList.map(function(t) {
+    var tugasUploads = DB.uploads.filter(function(u) { return +u.tugas_id === +t.id; });
+    var fileHtml = tugasUploads.length > 0
+      ? tugasUploads.map(function(u) {
+          return '<span class="badge badge-navy" style="font-size:.72rem;cursor:pointer;display:inline-flex;align-items:center;gap:4px;margin-bottom:2px" onclick="lihatFileTugas(' + u.id + ')" title="Klik untuk buka file"> ' + u.nama_file + '</span>';
+        }).join('<br>')
+      : '<span class="text-muted text-sm" style="font-size:.78rem">Belum dikumpulkan</span>';
+
+    return '<tr>' +
+      '<td><span class="font-600">' + t.judul + '</span></td>' +
+      '<td>' + anggotaHtml + '</td>' +
+      '<td class="text-sm text-muted">' + formatDate(t.deadline) + '</td>' +
+      '<td>' + statusBadge(t.status) + '</td>' +
+      '<td>' + fileHtml + (t.submitted_at ? '<div style="font-size:.68rem;color:var(--text-3);margin-top:2px"> ' + formatDate(t.submitted_at) + '</div>' : '') + '</td>' +
+      '<td>' +
+        '<div class="flex gap-6">' +
+          '<button class="btn btn-sm btn-outline" onclick="showEditTugasModal(' + t.id + ')">Edit</button>' +
+          '<button class="btn btn-sm btn-danger" onclick="hapusTugas(' + t.id + ', ' + kelompokId + ')">Hapus</button>' +
+        '</div>' +
+      '</td>' +
+    '</tr>';
+  }).join('');
+};

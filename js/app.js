@@ -1094,7 +1094,7 @@ function renderTugasDosen() {
           : `<div class="table-wrap">
               <table class="data-table">
                 <thead>
-                  <tr><th>Judul Tugas</th><th>Assignee</th><th>Deadline</th><th>Status</th><th>File</th><th>Aksi</th></tr>
+                  <tr><th>Judul Tugas</th><th>Anggota Kelompok</th><th>Deadline</th><th>Status</th><th>File</th><th>Aksi</th></tr>
                 </thead>
                 <tbody id="tugas-rows-${k.id}">
                   ${renderTugasRows(k.id)}
