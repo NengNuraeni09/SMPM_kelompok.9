@@ -46,10 +46,21 @@ require_once __DIR__ . '/../layout/header.php';
       <form method="POST" action="index.php?action=login">
         <div class="form-group mb-16">
           <label class="form-label">Email Akun</label>
-          <input name="email" id="login-email" class="form-control" type="email"
-                 placeholder="email@kampus.ac.id"
-                 value="<?= htmlspecialchars($_POST['email'] ?? '') ?>"
-                 required autocomplete="email" />
+          <div class="reg-input-wrap">
+            <input name="email" id="login-email" class="form-control" type="email"
+                   placeholder="email@kampus.ac.id"
+                   value="<?= htmlspecialchars($_POST['email'] ?? '') ?>"
+                   required autocomplete="email" style="padding-right:110px" />
+            <span class="reg-input-hint" title="Klik untuk isi domain @kampus.ac.id"
+                  onclick="(function(){
+                    var inp = document.getElementById('login-email');
+                    var val = inp.value.trim();
+                    if(!val) { inp.value = '@kampus.ac.id'; inp.setSelectionRange(0,0); inp.focus(); }
+                    else if(!val.includes('@')) { inp.value = val + '@kampus.ac.id'; inp.focus(); }
+                    else if(val.endsWith('@')) { inp.value = val + 'kampus.ac.id'; inp.focus(); }
+                    else { inp.focus(); }
+                  })()">@kampus.ac.id</span>
+          </div>
         </div>
         <div class="form-group mb-20">
           <label class="form-label">Password</label>

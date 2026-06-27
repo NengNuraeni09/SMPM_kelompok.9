@@ -26,7 +26,19 @@ require_once __DIR__ . '/../layout/sidebar.php';
           </div>
           <div class="form-group">
             <label class="form-label">Email *</label>
-            <input name="email" class="form-control" type="email" placeholder="email@kampus.ac.id" required />
+            <div class="reg-input-wrap">
+              <input name="email" id="admin-email-input" class="form-control" type="email"
+                     placeholder="email@kampus.ac.id" required style="padding-right:110px" />
+              <span class="reg-input-hint" title="Klik untuk isi domain @kampus.ac.id"
+                    onclick="(function(){
+                      var inp = document.getElementById('admin-email-input');
+                      var val = inp.value.trim();
+                      if(!val) { inp.value = '@kampus.ac.id'; inp.setSelectionRange(0,0); inp.focus(); }
+                      else if(!val.includes('@')) { inp.value = val + '@kampus.ac.id'; inp.focus(); }
+                      else if(val.endsWith('@')) { inp.value = val + 'kampus.ac.id'; inp.focus(); }
+                      else { inp.focus(); }
+                    })()">@kampus.ac.id</span>
+            </div>
           </div>
           <div class="form-group">
             <label class="form-label">Password *</label>

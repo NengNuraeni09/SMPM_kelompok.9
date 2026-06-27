@@ -84,7 +84,17 @@
         <form id="login-form">
           <div class="form-group mb-16">
             <label class="form-label">Email Akun</label>
-            <input id="login-email" class="form-control" type="email" placeholder="email@kampus.ac.id" value="" required />
+            <div class="reg-input-wrap">
+              <input id="login-email" class="form-control" type="email" placeholder="email@kampus.ac.id" value="" required style="padding-right:110px" />
+              <span class="reg-input-hint" title="Klik untuk isi domain @kampus.ac.id" onclick="(function(){
+                var inp = document.getElementById('login-email');
+                var val = inp.value.trim();
+                if(!val) { inp.value = '@kampus.ac.id'; inp.setSelectionRange(0,0); inp.focus(); }
+                else if(!val.includes('@')) { inp.value = val + '@kampus.ac.id'; inp.focus(); }
+                else if(val.endsWith('@')) { inp.value = val + 'kampus.ac.id'; inp.focus(); }
+                else { inp.focus(); }
+              })()">@kampus.ac.id</span>
+            </div>
           </div>
           <div class="form-group mb-8">
             <label class="form-label">Password</label>
@@ -226,7 +236,14 @@
               </label>
               <div class="reg-input-wrap">
                 <input id="reg-email" class="reg-input" type="email" placeholder="nama@kampus.ac.id" required />
-                <span class="reg-input-hint">@kampus.ac.id</span>
+                <span class="reg-input-hint" title="Klik untuk isi domain" onclick="(function(){
+                  var inp = document.getElementById('reg-email');
+                  var val = inp.value.trim();
+                  if(!val) { inp.value = '@kampus.ac.id'; inp.setSelectionRange(0,0); inp.focus(); }
+                  else if(!val.includes('@')) { inp.value = val + '@kampus.ac.id'; inp.focus(); }
+                  else if(val.endsWith('@')) { inp.value = val + 'kampus.ac.id'; inp.focus(); }
+                  else { inp.focus(); }
+                })()">@kampus.ac.id</span>
               </div>
             </div>
 
