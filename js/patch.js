@@ -1088,3 +1088,187 @@ function smpmAnggotaCount(kelompokId) {
     }, 100);
   };
 })();
+
+/* ============================================================
+   DASHBOARD DOSEN — hanya tampilkan kelompok bimbingan sendiri
+   ============================================================ */
+(function() {
+  var _origRenderDashboard = window.renderDashboard;
+  window.renderDashboard = function() {
+    if (!currentUser || currentUser.role !== 'dosen') {
+      if (_origRenderDashboard) _origRenderDashboard();
+      return;
+    }
+
+    // Filter hanya kelompok yang dibimbing dosen ini
+    var myKelompok = DB.kelompok.filter(function(k) {
+      return +k.dosen_id === +currentUser.id;
+    });
+
+    var onTrack  = myKelompok.filter(function(k) { return k.progress >= 50; }).length;
+    var perhatian = myKelompok.filter(function(k) { return k.progress < 50; }).length;
+
+    // Hitung total mahasiswa dari kelompok bimbingan
+    var myKelIds = myKelompok.map(function(k) { return +k.id; });
+    var totalMhs = DB.users.filter(function(u) {
+      return u.role === 'mahasiswa' && myKelIds.indexOf(+u.kelompok_id) !== -1;
+    }).length;
+    var totalUpload = DB.uploads.filter(function(u) {
+      return myKelIds.indexOf(+u.kelompok_id) !== -1;
+    }).length;
+
+    document.getElementById('dash-welcome').textContent =
+      'Halo, ' + currentUser.nama.split(' ')[0] + '! Anda membimbing ' + myKelompok.length + ' kelompok.';
+
+    document.getElementById('dash-stats').innerHTML =
+      '<div class="stat-card"><div class="stat-label">Kelompok Bimbingan</div><div class="stat-value">' + myKelompok.length + '</div></div>' +
+      '<div class="stat-card"><div class="stat-label">On Track</div><div class="stat-value" style="color:var(--success)">' + onTrack + '</div></div>' +
+      '<div class="stat-card"><div class="stat-label">Perlu Perhatian</div><div class="stat-value" style="color:var(--danger)">' + perhatian + '</div></div>' +
+      '<div class="stat-card"><div class="stat-label">Total Mahasiswa</div><div class="stat-value">' + totalMhs + '</div></div>';
+
+    document.getElementById('dash-progress').innerHTML = '';
+
+    if (myKelompok.length === 0) {
+      document.getElementById('dash-recent').innerHTML =
+        '<div class="card mt-16"><div class="empty-state"><p>Anda belum membimbing kelompok manapun.</p></div></div>';
+      return;
+    }
+
+    var rows = myKelompok.map(function(k) {
+      var anggota = DB.users.filter(function(u) {
+        return u.role === 'mahasiswa' && +u.kelompok_id === +k.id;
+      });
+      var maxAnggota = k.max_anggota || 7;
+      var tugasKelompok = DB.tugas.filter(function(t) { return +t.kelompok_id === +k.id; });
+      var selesai = tugasKelompok.filter(function(t) { return t.status === 'selesai'; }).length;
+
+      var anggotaHtml = anggota.length > 0
+        ? anggota.map(function(a) {
+            return '<div class="flex items-center gap-6" style="margin-bottom:2px">' +
+              '<div class="avatar" style="width:20px;height:20px;font-size:.55rem">' + a.avatar + '</div>' +
+              '<span class="text-sm">' + a.nama + '</span>' +
+            '</div>';
+          }).join('')
+        : '<span class="text-muted text-sm">Belum ada anggota</span>';
+
+      return '<tr>' +
+        '<td>' +
+          '<strong>' + k.nama + '</strong>' +
+          '<div class="text-xs text-muted mt-4" style="max-width:200px">' + k.tema + '</div>' +
+        '</td>' +
+        '<td>' + anggotaHtml + '</td>' +
+        '<td style="text-align:center">' +
+          '<span style="font-weight:700;color:' + (anggota.length >= maxAnggota ? 'var(--success)' : 'var(--accent)') + '">' +
+            anggota.length + '/' + maxAnggota +
+          '</span>' +
+        '</td>' +
+        '<td style="text-align:center;font-weight:700">' +
+          selesai + '/' + tugasKelompok.length +
+        '</td>' +
+        '<td style="min-width:140px">' +
+          '<div class="flex items-center gap-8">' +
+            '<div class="progress-wrap" style="flex:1"><div class="progress-fill ' + progressColor(k.progress) + '" style="width:' + k.progress + '%"></div></div>' +
+            '<span class="text-sm font-600">' + k.progress + '%</span>' +
+          '</div>' +
+        '</td>' +
+        '<td>' + progressBadge(k.progress) + '</td>' +
+      '</tr>';
+    }).join('');
+
+    document.getElementById('dash-recent').innerHTML =
+      '<div class="card mt-16">' +
+        '<div class="flex justify-between items-center mb-16" style="flex-wrap:wrap;gap:8px">' +
+          '<div class="card-title" style="margin:0">Kelompok Bimbingan Saya</div>' +
+          '<button class="btn btn-primary btn-sm" onclick="showPage(\'tugasDosen\')" style="display:flex;align-items:center;gap:6px;font-size:.82rem">' +
+            '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>' +
+            'Tambah Tugas' +
+          '</button>' +
+        '</div>' +
+        '<div class="table-wrap">' +
+          '<table class="data-table">' +
+            '<thead><tr>' +
+              '<th>Kelompok & Tema</th>' +
+              '<th>Anggota</th>' +
+              '<th style="text-align:center">Jumlah</th>' +
+              '<th style="text-align:center">Tugas Selesai</th>' +
+              '<th>Progress</th>' +
+              '<th>Status</th>' +
+            '</tr></thead>' +
+            '<tbody>' + rows + '</tbody>' +
+          '</table>' +
+        '</div>' +
+      '</div>';
+  };
+})();
+
+/* Override renderTugasDosen: hanya tampilkan kelompok bimbingan dosen ini */
+(function() {
+  var _origRender = window.renderTugasDosen;
+  window.renderTugasDosen = function() {
+    if (!currentUser || currentUser.role !== 'dosen') {
+      if (_origRender) _origRender();
+      return;
+    }
+    // Filter kelompok hanya milik dosen ini
+    var myKelompok = DB.kelompok.filter(function(k) {
+      return +k.dosen_id === +currentUser.id;
+    });
+
+    var container = document.getElementById('tugasDosen-list');
+    if (!container) { if (_origRender) _origRender(); return; }
+
+    if (myKelompok.length === 0) {
+      container.innerHTML = '<div class="empty-state"><p>Anda belum membimbing kelompok manapun.</p></div>';
+      return;
+    }
+
+    // Patch DB.kelompok sementara agar renderTugasDosen asli hanya lihat kelompok milik dosen ini
+    var origKelompok = DB.kelompok.slice();
+    DB.kelompok.length = 0;
+    myKelompok.forEach(function(k) { DB.kelompok.push(k); });
+    if (_origRender) _origRender();
+    // Restore
+    DB.kelompok.length = 0;
+    origKelompok.forEach(function(k) { DB.kelompok.push(k); });
+  };
+})();
+
+/* Override renderMonitoring: hanya tampilkan kelompok bimbingan dosen ini */
+(function() {
+  var _origRender = window.renderMonitoring;
+  window.renderMonitoring = function() {
+    if (!currentUser || currentUser.role !== 'dosen') {
+      if (_origRender) _origRender();
+      return;
+    }
+    var myKelompok = DB.kelompok.filter(function(k) {
+      return +k.dosen_id === +currentUser.id;
+    });
+    var origKelompok = DB.kelompok.slice();
+    DB.kelompok.length = 0;
+    myKelompok.forEach(function(k) { DB.kelompok.push(k); });
+    if (_origRender) _origRender();
+    DB.kelompok.length = 0;
+    origKelompok.forEach(function(k) { DB.kelompok.push(k); });
+  };
+})();
+
+/* Override renderPenilaian: hanya tampilkan kelompok bimbingan dosen ini */
+(function() {
+  var _origRender = window.renderPenilaian;
+  window.renderPenilaian = function() {
+    if (!currentUser || currentUser.role !== 'dosen') {
+      if (_origRender) _origRender();
+      return;
+    }
+    var myKelompok = DB.kelompok.filter(function(k) {
+      return +k.dosen_id === +currentUser.id;
+    });
+    var origKelompok = DB.kelompok.slice();
+    DB.kelompok.length = 0;
+    myKelompok.forEach(function(k) { DB.kelompok.push(k); });
+    if (_origRender) _origRender();
+    DB.kelompok.length = 0;
+    origKelompok.forEach(function(k) { DB.kelompok.push(k); });
+  };
+})();
