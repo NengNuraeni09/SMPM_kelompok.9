@@ -16,9 +16,12 @@ function runMigrations(PDO $pdo): void {
     // Tambah kolom max_anggota jika belum ada (untuk DB yang sudah berjalan)
     try {
         $pdo->query('SELECT max_anggota FROM kelompok LIMIT 1');
+        // Kolom ada — pastikan semua row yang NULL atau 0 diset ke 7
+        $pdo->exec('UPDATE kelompok SET max_anggota = 7 WHERE max_anggota IS NULL OR max_anggota = 0');
     } catch (PDOException $e) {
         try {
             $pdo->exec('ALTER TABLE kelompok ADD COLUMN max_anggota TINYINT UNSIGNED NOT NULL DEFAULT 7 AFTER status');
+            $pdo->exec('UPDATE kelompok SET max_anggota = 7');
         } catch (PDOException $e2) { /* tabel belum ada, akan dibuat di bawah */ }
     }
 

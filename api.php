@@ -490,6 +490,15 @@ switch ($action) {
         }
         jsonOk(['updated' => $updated, 'message' => 'Password semua akun seed di-reset ke: password123']);
 
+    // Endpoint debug sementara - cek jumlah anggota per kelompok
+    case 'debug_kelompok':
+        $rows = db()->query(
+            'SELECT k.id, k.nama, k.max_anggota,
+             (SELECT COUNT(*) FROM users WHERE kelompok_id=k.id AND role=\'mahasiswa\') AS jumlah_anggota
+             FROM kelompok k ORDER BY k.id'
+        )->fetchAll();
+        jsonOk($rows);
+
     default:
         jsonErr('Action tidak dikenal.', 404);
 }
