@@ -262,13 +262,15 @@ switch ($action) {
         $newId = (int) db()->lastInsertId();
         db()->prepare('UPDATE tugas SET status=? WHERE id=?')->execute(['selesai',$tugasId]);
 
-        // Update progress kelompok otomatis berdasarkan % tugas selesai
+        // Progress = % tugas selesai dari total tugas kelompok (otomatis)
         $cntT2 = db()->prepare('SELECT COUNT(*) as cnt FROM tugas WHERE kelompok_id=?');
         $cntT2->execute([(int)$user['kelompok_id']]);
         $totalT = (int)($cntT2->fetch()['cnt'] ?? 0);
+
         $cntS2 = db()->prepare("SELECT COUNT(*) as cnt FROM tugas WHERE kelompok_id=? AND status='selesai'");
         $cntS2->execute([(int)$user['kelompok_id']]);
         $selesaiT = (int)($cntS2->fetch()['cnt'] ?? 0);
+
         $newProgress = $totalT > 0 ? (int)round($selesaiT / $totalT * 100) : 0;
         db()->prepare('UPDATE kelompok SET progress=? WHERE id=?')->execute([$newProgress, (int)$user['kelompok_id']]);
 
@@ -363,7 +365,7 @@ switch ($action) {
         $feedback   = trim($_POST['feedback'] ?? '');
         if (!$kelompokId) jsonErr('Kelompok tidak valid.');
 
-        // Simpan penilaian
+        // Simpan penilaian — progress TIDAK diubah, progress = % tugas selesai
         $stmt = db()->prepare(
             'INSERT INTO penilaian (kelompok_id,dosen_id,nilai,feedback)
              VALUES (?,?,?,?)
@@ -371,12 +373,16 @@ switch ($action) {
         );
         $stmt->execute([$kelompokId, (int)$_SESSION['user']['id'], $nilai, $feedback]);
 
-        // Progress mengikuti nilai yang diberikan dosen
-        $progress = min(100, max(0, $nilai));
-        db()->prepare('UPDATE kelompok SET progress=? WHERE id=?')->execute([$progress, $kelompokId]);
+        // Kembalikan progress aktual dari % tugas selesai
+        $cntTP = db()->prepare('SELECT COUNT(*) as cnt FROM tugas WHERE kelompok_id=?');
+        $cntTP->execute([$kelompokId]);
+        $totalTP = (int)($cntTP->fetch()['cnt'] ?? 0);
+        $cntSP = db()->prepare("SELECT COUNT(*) as cnt FROM tugas WHERE kelompok_id=? AND status='selesai'");
+        $cntSP->execute([$kelompokId]);
+        $selesaiP = (int)($cntSP->fetch()['cnt'] ?? 0);
+        $currentProgress = $totalTP > 0 ? (int)round($selesaiP / $totalTP * 100) : 0;
 
-        jsonOk(['progress' => $progress]);
-
+        jsonOk(['progress' => $currentProgress]);
     /* ---------- ADMIN: USER ---------- */
 
     case 'add_user':

@@ -780,7 +780,7 @@ function simpanNilai(kelompokId) {
           var label = progWrap.querySelector('.prog-label');
           if (label) label.textContent = newProgress + '%';
         }
-        showToast('Nilai berhasil disimpan! Progress kelompok: ' + newProgress + '%', 'success');
+        showToast('Nilai berhasil disimpan!', 'success');
         // Re-render halaman penilaian agar semua data fresh
         if (typeof renderPage === 'function') renderPage('penilaian');
       });
