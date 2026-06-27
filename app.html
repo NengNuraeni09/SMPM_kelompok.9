@@ -85,7 +85,7 @@
           <div class="form-group mb-16">
             <label class="form-label">Email Akun</label>
             <div class="reg-input-wrap">
-              <input id="login-email" class="form-control" type="email" placeholder="email@kampus.ac.id" value="" required />
+              <input id="login-email" class="form-control" type="email" placeholder="email@kampus.ac.id" required autocomplete="off" />
               <span class="reg-input-hint" title="Klik untuk isi domain @kampus.ac.id" onclick="(function(){
                 var inp = document.getElementById('login-email');
                 var val = inp.value.trim();
@@ -99,7 +99,7 @@
           <div class="form-group mb-8">
             <label class="form-label">Password</label>
             <div style="position:relative">
-              <input id="login-pass" class="form-control" type="password" placeholder="••••••••" value="" required style="padding-right:42px" />
+              <input id="login-pass" class="form-control" type="password" placeholder="••••••••" required style="padding-right:42px" autocomplete="off" />
               <button type="button" id="login-pass-toggle"
                 onclick="(function(){var i=document.getElementById('login-pass');var b=document.getElementById('login-pass-toggle');i.type=i.type==='password'?'text':'password';b.innerHTML=i.type==='password'?'<svg width=&quot;16&quot; height=&quot;16&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2&quot;><path d=&quot;M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z&quot;/><circle cx=&quot;12&quot; cy=&quot;12&quot; r=&quot;3&quot;/></svg>':'<svg width=&quot;16&quot; height=&quot;16&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2&quot;><path d=&quot;M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24&quot;/><line x1=&quot;1&quot; y1=&quot;1&quot; x2=&quot;23&quot; y2=&quot;23&quot;/></svg>';})()"
                 style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-3);padding:4px;display:flex;align-items:center;transition:color .15s"
@@ -217,14 +217,14 @@
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                   Nama Lengkap
                 </label>
-                <input id="reg-nama" class="reg-input" type="text" placeholder="Nama lengkap Anda" required />
+                <input id="reg-nama" class="reg-input" type="text" placeholder="Nama lengkap Anda" required autocomplete="off" />
               </div>
               <div class="reg-field">
                 <label class="reg-label">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-4 0v2M12 12v4"/></svg>
                   NIM
                 </label>
-                <input id="reg-nim" class="reg-input" type="text" placeholder="Contoh: 2021001" required />
+                <input id="reg-nim" class="reg-input" type="text" placeholder="Contoh: 2021001" required autocomplete="off" />
               </div>
             </div>
 
@@ -235,7 +235,7 @@
                 Email Kampus
               </label>
               <div class="reg-input-wrap">
-                <input id="reg-email" class="reg-input" type="email" placeholder="nama@kampus.ac.id" required />
+                <input id="reg-email" class="reg-input" type="email" placeholder="nama@kampus.ac.id" required autocomplete="off" />
                 <span class="reg-input-hint" title="Klik untuk isi domain" onclick="(function(){
                   var inp = document.getElementById('reg-email');
                   var val = inp.value.trim();
@@ -266,7 +266,7 @@
                   Password
                 </label>
                 <div class="reg-pass-wrap">
-                  <input id="reg-pass" class="reg-input" type="password" placeholder="Min. 6 karakter" required />
+                  <input id="reg-pass" class="reg-input" type="password" placeholder="Min. 6 karakter" required autocomplete="new-password" />
                   <button type="button" class="reg-eye-btn" onclick="toggleRegPass('reg-pass', this)" tabindex="-1">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                   </button>
@@ -278,7 +278,7 @@
                   Konfirmasi
                 </label>
                 <div class="reg-pass-wrap">
-                  <input id="reg-confirm" class="reg-input" type="password" placeholder="Ulangi password" required />
+                  <input id="reg-confirm" class="reg-input" type="password" placeholder="Ulangi password" required autocomplete="new-password" />
                   <button type="button" class="reg-eye-btn" onclick="toggleRegPass('reg-confirm', this)" tabindex="-1">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                   </button>

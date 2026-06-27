@@ -269,6 +269,11 @@ function smpmPatchRegisterPage() {
   if (origShow && !origShow._smpmPatched) {
     window.showRegisterPage = function() {
       origShow();
+      // Kosongkan semua field form daftar
+      ['reg-nama','reg-nim','reg-email','reg-pass','reg-confirm'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.value = '';
+      });
       var sel = document.getElementById('reg-kelompok');
       if (sel) {
         sel.innerHTML = '<option value="">— Pilih kelompok Anda —</option>' +
@@ -276,6 +281,9 @@ function smpmPatchRegisterPage() {
             .map(function(k) { return '<option value="' + k.id + '">' + k.nama + ' — ' + k.tema + '</option>'; })
             .join('');
       }
+      // Sembunyikan pesan error
+      var errDiv = document.getElementById('register-error');
+      if (errDiv) errDiv.classList.add('hidden');
     };
     window.showRegisterPage._smpmPatched = true;
   }
@@ -315,7 +323,11 @@ function smpmGoToLogin() {
   // Tampilkan halaman login
   var loginPage = document.getElementById('page-login');
   if (loginPage) loginPage.classList.remove('hidden');
-  // Hapus error yang mungkin muncul dari session sebelumnya
+  // Kosongkan & bersihkan form login
+  var loginEmail = document.getElementById('login-email');
+  var loginPass  = document.getElementById('login-pass');
+  if (loginEmail) loginEmail.value = '';
+  if (loginPass)  loginPass.value  = '';
   var errEl = document.getElementById('login-error');
   if (errEl) errEl.classList.add('hidden');
 }
@@ -449,10 +461,10 @@ function smpmHandleRegister() {
       // (tidak langsung masuk karena perlu admin verifikasi / login manual)
       smpmGoToLogin();
       smpmPatchForms();
-      // Isi otomatis email di form login
+      // Kosongkan form login — user harus isi sendiri
       var loginEmail = document.getElementById('login-email');
       var loginPass  = document.getElementById('login-pass');
-      if (loginEmail) loginEmail.value = email;
+      if (loginEmail) loginEmail.value = '';
       if (loginPass)  loginPass.value  = '';
       showToast('✅ Akun berhasil dibuat! Silakan masuk dengan akun Anda.', 'success');
     })
