@@ -770,19 +770,32 @@ input, select, textarea { font-family: var(--font-body); }
 }
 
 /* email hint badge */
-.reg-input-wrap { position: relative; }
+.reg-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.reg-input-wrap input {
+  flex: 1;
+  min-width: 0;
+}
 .reg-input-hint {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
+  flex-shrink: 0;
   font-size: .72rem;
   font-weight: 600;
   color: var(--accent);
   background: var(--accent-lt);
-  padding: 2px 8px;
+  padding: 4px 10px;
   border-radius: 20px;
-  pointer-events: none;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: background .15s, color .15s;
+  border: 1px solid var(--accent);
+}
+.reg-input-hint:hover {
+  background: var(--accent);
+  color: #fff;
 }
 
 /* password eye toggle */

@@ -28,7 +28,7 @@ require_once __DIR__ . '/../layout/sidebar.php';
             <label class="form-label">Email *</label>
             <div class="reg-input-wrap">
               <input name="email" id="admin-email-input" class="form-control" type="email"
-                     placeholder="email@kampus.ac.id" required style="padding-right:110px" />
+                     placeholder="email@kampus.ac.id" required />
               <span class="reg-input-hint" title="Klik untuk isi domain @kampus.ac.id"
                     onclick="(function(){
                       var inp = document.getElementById('admin-email-input');

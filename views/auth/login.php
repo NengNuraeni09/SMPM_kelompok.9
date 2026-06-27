@@ -50,7 +50,7 @@ require_once __DIR__ . '/../layout/header.php';
             <input name="email" id="login-email" class="form-control" type="email"
                    placeholder="email@kampus.ac.id"
                    value="<?= htmlspecialchars($_POST['email'] ?? '') ?>"
-                   required autocomplete="email" style="padding-right:110px" />
+                   required autocomplete="email" />
             <span class="reg-input-hint" title="Klik untuk isi domain @kampus.ac.id"
                   onclick="(function(){
                     var inp = document.getElementById('login-email');
