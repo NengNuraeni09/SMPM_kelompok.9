@@ -751,7 +751,45 @@ function konfirmasiHapusUpload(uploadId) {
   smpmPost('delete_upload', { id: uploadId })
     .then(function(res) {
       if (!res.ok) { showToast(res.message || 'Gagal hapus.', 'error'); return; }
-      smpmLoadDB().then(function() { closeModal(); renderUpload(); showToast('File berhasil dihapus!', 'success'); });
+      // Hapus juga dari DB lokal agar UI responsif
+      var idx = DB.uploads.findIndex(function(u) { return +u.id === +uploadId; });
+      if (idx > -1) DB.uploads.splice(idx, 1);
+      closeModal();
+      renderUpload();
+      showToast('File berhasil dihapus!', 'success');
+      // Sync data fresh di background
+      smpmLoadDB().then(function() { renderUpload(); });
     })
     .catch(function(err) { smpmHandleError(err); });
 }
+
+// Override hapusUpload dari app.js agar pakai loose comparison (+id)
+// karena id dari server bisa string, dari JS bisa number
+window.hapusUpload = function(uploadId) {
+  var upload = DB.uploads.find(function(u) { return +u.id === +uploadId; });
+  if (!upload) {
+    showToast('File tidak ditemukan.', 'error');
+    return;
+  }
+  var overlay = document.getElementById('modal-overlay');
+  var body    = document.getElementById('modal-body');
+  if (!overlay || !body) return;
+  body.innerHTML =
+    '<div class="modal-header">' +
+      '<div class="modal-title">Konfirmasi Hapus File</div>' +
+      '<button class="modal-close" onclick="closeModal()">&times;</button>' +
+    '</div>' +
+    '<div style="text-align:center;padding:20px 0">' +
+      '<div style="width:64px;height:64px;background:var(--danger-lt);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">' +
+        '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>' +
+      '</div>' +
+      '<p style="font-size:1rem;font-weight:600;margin-bottom:8px">Hapus File Ini?</p>' +
+      '<p style="font-size:.875rem;color:var(--text-3);margin-bottom:16px">' + upload.nama_file + '</p>' +
+    '</div>' +
+    '<div style="display:flex;gap:10px">' +
+      '<button class="btn btn-outline w-full" onclick="closeModal()" style="justify-content:center">Batal</button>' +
+      '<button class="btn btn-danger w-full" onclick="konfirmasiHapusUpload(' + (+upload.id) + ')" style="justify-content:center">Ya, Hapus</button>' +
+    '</div>';
+  overlay.classList.remove('hidden');
+};
+
