@@ -323,25 +323,83 @@ function smpmPatchRegisterPage() {
           return k.status === 'aktif' && +(k.jumlah_anggota || 0) >= +(k.max_anggota || 7);
         });
 
-        var html = '<option value="">— Pilih kelompok Anda —</option>';
-        if (tersedia.length > 0) {
-          html += '<optgroup label="✅ Tersedia">' +
-            tersedia.map(function(k) {
-              return '<option value="' + k.id + '">' + k.nama + ' – ' + k.tema + '</option>';
-            }).join('') + '</optgroup>';
-        }
-        if (penuhList.length > 0) {
-          html += '<optgroup label="🔒 Penuh (tidak bisa dipilih)">' +
-            penuhList.map(function(k) {
-              return '<option value="kelompok_penuh_' + k.id + '">' + k.nama + ' – ' + k.tema + ' (Penuh)</option>';
-            }).join('') + '</optgroup>';
-        }
-        sel.innerHTML = html;
+        // Sembunyikan select asli, buat custom dropdown
+        sel.style.display = 'none';
+        var existingCustom = document.getElementById('reg-kelompok-custom');
+        if (existingCustom) existingCustom.remove();
 
-        // Cegah pilih kelompok penuh — reset ke kosong kalau value mengandung "kelompok_penuh_"
+        var wrapper = document.createElement('div');
+        wrapper.id = 'reg-kelompok-custom';
+        wrapper.style.cssText = 'display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto;padding:4px 0';
+
+        if (tersedia.length === 0 && penuhList.length === 0) {
+          wrapper.innerHTML = '<div style="padding:12px;text-align:center;color:var(--text-3);font-size:.85rem">Belum ada kelompok tersedia</div>';
+        }
+
+        if (tersedia.length > 0) {
+          var hdrT = document.createElement('div');
+          hdrT.style.cssText = 'font-size:.7rem;font-weight:700;color:var(--success);text-transform:uppercase;letter-spacing:.05em;padding:4px 10px';
+          hdrT.textContent = '✅ Tersedia';
+          wrapper.appendChild(hdrT);
+
+          tersedia.forEach(function(k) {
+            var item = document.createElement('div');
+            item.style.cssText = 'padding:10px 14px;border-radius:var(--radius-md);border:2px solid var(--border);cursor:pointer;background:var(--white);transition:all .15s';
+            item.innerHTML = '<div style="font-weight:600;font-size:.88rem">' + k.nama + '</div>' +
+              '<div style="font-size:.78rem;color:var(--text-3);margin-top:2px">' + k.tema + '</div>';
+            item.addEventListener('mouseover', function() { item.style.borderColor = 'var(--accent)'; item.style.background = 'var(--accent-lt)'; });
+            item.addEventListener('mouseout', function() {
+              item.style.borderColor = item._selected ? 'var(--accent)' : 'var(--border)';
+              item.style.background = item._selected ? 'var(--accent-lt)' : 'var(--white)';
+            });
+            item.addEventListener('click', function() {
+              // Reset semua
+              wrapper.querySelectorAll('[data-kel-id]').forEach(function(el) {
+                el._selected = false;
+                el.style.borderColor = 'var(--border)';
+                el.style.background = 'var(--white)';
+              });
+              // Pilih ini
+              item._selected = true;
+              item.style.borderColor = 'var(--accent)';
+              item.style.background = 'var(--accent-lt)';
+              sel.value = k.id;
+              // Trigger change event
+              var ev = new Event('change', { bubbles: true });
+              sel.dispatchEvent(ev);
+            });
+            item.setAttribute('data-kel-id', k.id);
+            wrapper.appendChild(item);
+          });
+        }
+
+        if (penuhList.length > 0) {
+          var hdrP = document.createElement('div');
+          hdrP.style.cssText = 'font-size:.7rem;font-weight:700;color:var(--danger);text-transform:uppercase;letter-spacing:.05em;padding:8px 10px 4px';
+          hdrP.textContent = '🔒 Penuh - Tidak bisa dipilih';
+          wrapper.appendChild(hdrP);
+
+          penuhList.forEach(function(k) {
+            var item = document.createElement('div');
+            item.style.cssText = 'padding:10px 14px;border-radius:var(--radius-md);border:2px solid #fee2e2;background:#fef2f2;opacity:.65;cursor:not-allowed';
+            item.innerHTML = '<div style="font-weight:600;font-size:.88rem;color:#9ca3af">' + k.nama + ' <span style="font-size:.72rem;background:#fca5a5;color:#7f1d1d;padding:1px 6px;border-radius:10px">PENUH</span></div>' +
+              '<div style="font-size:.78rem;color:#d1d5db;margin-top:2px">' + k.tema + '</div>';
+            // Tidak ada event listener - benar-benar tidak bisa diklik
+            wrapper.appendChild(item);
+          });
+        }
+
+        // Tambah hidden option untuk tersedia (agar form validation bekerja)
+        sel.innerHTML = '<option value="">— Pilih kelompok —</option>' +
+          tersedia.map(function(k) { return '<option value="' + k.id + '">' + k.nama + '</option>'; }).join('') +
+          penuhList.map(function(k) { return '<option value="kelompok_penuh_' + k.id + '" disabled>' + k.nama + ' (Penuh)</option>'; }).join('');
+
+        sel.parentNode.insertBefore(wrapper, sel.nextSibling);
+
+        // Event listener tetap ada sebagai safety net
         sel.addEventListener('change', function() {
           if (sel.value && sel.value.indexOf('kelompok_penuh_') === 0) {
-            showToast('Kelompok ini sudah penuh! Silakan pilih kelompok lain.', 'error');
+            showToast('Kelompok ini sudah penuh!', 'error');
             sel.value = '';
           }
         });
@@ -372,6 +430,7 @@ function smpmPatchRegisterPage() {
             }).join('') + '</optgroup>';
         }
         sel.innerHTML = html;
+        sel.style.display = '';
         sel.addEventListener('change', function() {
           if (sel.value && sel.value.indexOf('kelompok_penuh_') === 0) {
             showToast('Kelompok ini sudah penuh! Silakan pilih kelompok lain.', 'error');
