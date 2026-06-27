@@ -126,7 +126,13 @@ function smpmLoadDB() {
       DB.users.push(Object.assign({}, u, { id: +u.id, kelompok_id: u.kelompok_id ? +u.kelompok_id : null }));
     });
     (d.kelompok || []).forEach(function(k) {
-      DB.kelompok.push(Object.assign({}, k, { id: +k.id, dosen_id: k.dosen_id ? +k.dosen_id : null, progress: +k.progress, max_anggota: +(k.max_anggota || 7) }));
+      DB.kelompok.push(Object.assign({}, k, {
+        id: +k.id,
+        dosen_id: k.dosen_id ? +k.dosen_id : null,
+        progress: +k.progress,
+        max_anggota: +(k.max_anggota || 7),
+        jumlah_anggota: +(k.jumlah_anggota || 0)
+      }));
     });
     (d.tugas || []).forEach(function(t) {
       DB.tugas.push(Object.assign({}, t, { id: +t.id, kelompok_id: +t.kelompok_id, assignee: t.assignee_id ? +t.assignee_id : null, assignee_id: t.assignee_id ? +t.assignee_id : null, file: null }));
@@ -295,7 +301,9 @@ function smpmPatchRegisterPage() {
         (d.kelompok || []).forEach(function(k) {
           DB.kelompok.push(Object.assign({}, k, {
             id: +k.id, dosen_id: k.dosen_id ? +k.dosen_id : null,
-            progress: +k.progress, max_anggota: +(k.max_anggota || 7)
+            progress: +k.progress,
+            max_anggota: +(k.max_anggota || 7),
+            jumlah_anggota: +(k.jumlah_anggota || 0)
           }));
         });
         DB.users.length = 0;
@@ -310,12 +318,12 @@ function smpmPatchRegisterPage() {
         sel.innerHTML = '<option value="">— Pilih kelompok Anda —</option>' +
           DB.kelompok.filter(function(k) { return k.status === 'aktif'; })
             .map(function(k) {
-              var anggota    = DB.users.filter(function(u) { return +u.kelompok_id === +k.id && u.role === 'mahasiswa'; }).length;
+              var anggota    = k.jumlah_anggota;   // pakai data langsung dari server
               var maxAnggota = k.max_anggota || 7;
               var penuh      = anggota >= maxAnggota;
-              return '<option value="' + k.id + '"' + (penuh ? ' disabled' : '') + '>' +
+              return '<option value="' + k.id + '"' + (penuh ? ' disabled style="color:#aaa;background:#f5f5f5"' : '') + '>' +
                 k.nama + ' — ' + k.tema +
-                ' (' + anggota + '/' + maxAnggota + (penuh ? ' — PENUH' : '') + ')' +
+                ' (' + anggota + '/' + maxAnggota + (penuh ? ' — PENUH 🔒' : '') + ')' +
               '</option>';
             }).join('');
       }).catch(function() {
@@ -328,8 +336,8 @@ function smpmPatchRegisterPage() {
               var anggota    = DB.users.filter(function(u) { return +u.kelompok_id === +k.id && u.role === 'mahasiswa'; }).length;
               var maxAnggota = k.max_anggota || 7;
               var penuh      = anggota >= maxAnggota;
-              return '<option value="' + k.id + '"' + (penuh ? ' disabled' : '') + '>' +
-                k.nama + ' (' + anggota + '/' + maxAnggota + (penuh ? ' — PENUH' : '') + ')' +
+              return '<option value="' + k.id + '"' + (penuh ? ' disabled style="color:#aaa;background:#f5f5f5"' : '') + '>' +
+                k.nama + ' (' + anggota + '/' + maxAnggota + (penuh ? ' — PENUH 🔒' : '') + ')' +
               '</option>';
             }).join('');
       });

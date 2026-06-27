@@ -769,6 +769,14 @@ input, select, textarea { font-family: var(--font-body); }
   padding-right: 36px;
 }
 
+/* option disabled di select - kelompok penuh */
+select option:disabled {
+  color: #aaa !important;
+  background: #f5f5f5 !important;
+  font-style: italic;
+  cursor: not-allowed;
+}
+
 /* email hint badge */
 .reg-input-wrap {
   display: flex;

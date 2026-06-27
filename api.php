@@ -159,7 +159,9 @@ switch ($action) {
         $user = $_SESSION['user'];
 
         // Ambil semua data yang dibutuhkan frontend sesuai role
-        $kelompok   = db()->query('SELECT k.*,u.nama AS dosen_nama FROM kelompok k LEFT JOIN users u ON k.dosen_id=u.id ORDER BY k.id')->fetchAll();
+        $kelompok   = db()->query('SELECT k.*,u.nama AS dosen_nama,
+            (SELECT COUNT(*) FROM users WHERE kelompok_id=k.id AND role=\'mahasiswa\') AS jumlah_anggota
+            FROM kelompok k LEFT JOIN users u ON k.dosen_id=u.id ORDER BY k.id')->fetchAll();
         $users      = db()->query('SELECT id,nama,nim,email,role,avatar,kelompok_id FROM users ORDER BY role,nama')->fetchAll();
         $tugas      = db()->query('SELECT * FROM tugas ORDER BY deadline ASC')->fetchAll();
         $uploads    = db()->query('SELECT id,nama_file,path_file,ukuran,tipe,kelompok_id,user_id,tugas_id,uploaded_at FROM uploads ORDER BY uploaded_at DESC')->fetchAll();
