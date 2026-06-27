@@ -260,9 +260,10 @@ switch ($action) {
         $row = db()->prepare('SELECT * FROM uploads WHERE id=? LIMIT 1'); $row->execute([$id]);
         $up = $row->fetch();
         if (!$up) jsonErr('File tidak ditemukan.', 404);
-        // Hanya pemilik atau dosen/admin yg boleh hapus
+        // Mahasiswa bisa hapus file milik kelompoknya sendiri (tugas kelompok)
+        // Dosen/admin bisa hapus semua
         $user = $_SESSION['user'];
-        if ($user['role'] === 'mahasiswa' && (int)$up['user_id'] !== (int)$user['id'])
+        if ($user['role'] === 'mahasiswa' && (int)$up['kelompok_id'] !== (int)$user['kelompok_id'])
             jsonErr('Akses ditolak.', 403);
         // Hapus file fisik
         $path = __DIR__ . '/' . $up['path_file'];
