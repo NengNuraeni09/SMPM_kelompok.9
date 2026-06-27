@@ -461,11 +461,11 @@ function smpmHandleRegister() {
       // (tidak langsung masuk karena perlu admin verifikasi / login manual)
       smpmGoToLogin();
       smpmPatchForms();
-      // Isi email & password ke form login agar user tinggal klik Masuk
+      // Isi email saja, password dikosongkan — user ketik sendiri
       var loginEmail = document.getElementById('login-email');
       var loginPass  = document.getElementById('login-pass');
       if (loginEmail) loginEmail.value = email;
-      if (loginPass)  loginPass.value  = password;
+      if (loginPass)  loginPass.value  = '';
       showToast('✅ Akun berhasil dibuat! Silakan masuk dengan akun Anda.', 'success');
     })
     .catch(function(err) {
