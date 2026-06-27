@@ -321,7 +321,7 @@ function smpmPatchRegisterPage() {
               var anggota    = k.jumlah_anggota;
               var maxAnggota = k.max_anggota || 7;
               var penuh      = anggota >= maxAnggota;
-              var label      = k.nama + ' – ' + k.tema + (penuh ? ' [PENUH ' + anggota + '/' + maxAnggota + ']' : ' [' + anggota + '/' + maxAnggota + ' anggota]');
+              var label      = k.nama + ' – ' + k.tema + (penuh ? ' (Penuh)' : '');
               return '<option value="' + k.id + '"' + (penuh ? ' disabled' : '') + '>' + label + '</option>';
             }).join('');
       }).catch(function() {
@@ -333,7 +333,7 @@ function smpmPatchRegisterPage() {
               var anggota    = DB.users.filter(function(u) { return +u.kelompok_id === +k.id && u.role === 'mahasiswa'; }).length;
               var maxAnggota = k.max_anggota || 7;
               var penuh      = anggota >= maxAnggota;
-              var label      = k.nama + ' – ' + k.tema + (penuh ? ' [PENUH ' + anggota + '/' + maxAnggota + ']' : ' [' + anggota + '/' + maxAnggota + ' anggota]');
+              var label      = k.nama + ' – ' + k.tema + (penuh ? ' (Penuh)' : '');
               return '<option value="' + k.id + '"' + (penuh ? ' disabled' : '') + '>' + label + '</option>';
             }).join('');
       });
