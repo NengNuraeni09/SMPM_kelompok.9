@@ -2437,7 +2437,7 @@ function renderKelompokTable() {
   const countEl = document.getElementById('kk-count');
   if (!tbody) return;
 
-  const MAX_ANGGOTA = 5;
+  const MAX_ANGGOTA = 7;
 
   let list = DB.kelompok.map(k => ({
     ...k,
@@ -2854,7 +2854,7 @@ function showEditKelompokModal(kelompokId) {
         </div>
         <div class="form-group" style="flex:1">
           <label class="form-label">Maks. Anggota</label>
-          <input class="form-control" id="ek-maxanggota" type="number" min="1" max="20" value="${k.max_anggota||5}" />
+          <input class="form-control" id="ek-maxanggota" type="number" min="1" max="7" value="${k.max_anggota||7}" />
         </div>
       </div>
       <div class="form-group">
@@ -2885,7 +2885,7 @@ function updateKelompok(kelompokId) {
   const dosenId  = document.getElementById('ek-dosen').value;
   const progress = parseInt(document.getElementById('ek-progress').value) || 0;
   const status   = document.getElementById('ek-status').value;
-  const maxAngg  = parseInt(document.getElementById('ek-maxanggota').value) || 5;
+  const maxAngg  = parseInt(document.getElementById('ek-maxanggota').value) || 7;
   const semester = document.getElementById('ek-semester')?.value.trim() || null;
 
   if (!nama) { showToast('Nama kelompok wajib diisi!', 'error'); return; }

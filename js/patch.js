@@ -583,11 +583,17 @@ function updateKelompok(kelompokId) {
   var dosenId  = (document.getElementById('ek-dosen')     || {}).value || null;
   var progress = parseInt((document.getElementById('ek-progress') || {}).value) || 0;
   var status   = (document.getElementById('ek-status')    || {}).value || 'aktif';
+  var maxAngg  = parseInt((document.getElementById('ek-maxanggota') || {}).value) || 7;
   if (!nama) { showToast('Nama kelompok wajib!', 'error'); return; }
   if (!tema) { showToast('Tema proyek wajib!', 'error'); return; }
+  // Validasi: max tidak boleh kurang dari anggota saat ini
+  var currentAnggota = DB.users.filter(function(u) { return +u.kelompok_id === +kelompokId && u.role === 'mahasiswa'; }).length;
+  if (maxAngg < currentAnggota) {
+    showToast('Batas anggota (' + maxAngg + ') lebih kecil dari anggota saat ini (' + currentAnggota + ')!', 'error'); return;
+  }
   var btn = document.querySelector('#modal-body .btn-primary');
   if (btn) { btn.disabled = true; btn.textContent = 'Menyimpan...'; }
-  smpmPost('update_kelompok', { id: kelompokId, nama: nama, tema: tema, dosen_id: dosenId, progress: progress, status: status })
+  smpmPost('update_kelompok', { id: kelompokId, nama: nama, tema: tema, dosen_id: dosenId, progress: progress, status: status, max_anggota: maxAngg })
     .then(function(res) {
       if (btn) { btn.disabled = false; btn.textContent = 'Simpan Perubahan'; }
       if (!res.ok) { showToast(res.message || 'Gagal update kelompok.', 'error'); return; }

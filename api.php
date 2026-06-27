@@ -439,13 +439,21 @@ switch ($action) {
     case 'update_kelompok':
         requireRole(['admin']);
         $id = (int)($_POST['id'] ?? 0);
-        db()->prepare('UPDATE kelompok SET nama=?,tema=?,dosen_id=?,progress=?,status=? WHERE id=?')
+        $maxAnggota = min(7, max(1, (int)($_POST['max_anggota'] ?? 7)));
+        // Validasi: tidak boleh set max lebih kecil dari jumlah anggota saat ini
+        $cntStmt = db()->prepare('SELECT COUNT(*) as cnt FROM users WHERE kelompok_id=? AND role=?');
+        $cntStmt->execute([$id, 'mahasiswa']);
+        $cntAnggota = (int)($cntStmt->fetch()['cnt'] ?? 0);
+        if ($maxAnggota < $cntAnggota)
+            jsonErr("Batas anggota ($maxAnggota) lebih kecil dari anggota saat ini ($cntAnggota).");
+        db()->prepare('UPDATE kelompok SET nama=?,tema=?,dosen_id=?,progress=?,status=?,max_anggota=? WHERE id=?')
             ->execute([
                 trim($_POST['nama'] ?? ''),
                 trim($_POST['tema'] ?? ''),
                 (int)($_POST['dosen_id'] ?? 0) ?: null,
                 (int)($_POST['progress'] ?? 0),
                 $_POST['status'] ?? 'aktif',
+                $maxAnggota,
                 $id
             ]);
         $s = db()->prepare('SELECT k.*,u.nama AS dosen_nama FROM kelompok k LEFT JOIN users u ON k.dosen_id=u.id WHERE k.id=?'); $s->execute([$id]);
