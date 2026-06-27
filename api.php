@@ -269,7 +269,7 @@ switch ($action) {
         $newId = (int) db()->lastInsertId();
         db()->prepare('UPDATE tugas SET status=? WHERE id=?')->execute(['selesai',$tugasId]);
 
-        // Progress = % tugas selesai dari total tugas kelompok (otomatis)
+        // Progress = % tugas dikerjakan (selesai + terlambat tapi sudah dikumpul) dari total
         $cntT2 = db()->prepare('SELECT COUNT(*) as cnt FROM tugas WHERE kelompok_id=?');
         $cntT2->execute([(int)$user['kelompok_id']]);
         $totalT = (int)($cntT2->fetch()['cnt'] ?? 0);
@@ -389,8 +389,7 @@ switch ($action) {
         $selesaiP = (int)($cntSP->fetch()['cnt'] ?? 0);
         $currentProgress = $totalTP > 0 ? (int)round($selesaiP / $totalTP * 100) : 0;
 
-        jsonOk(['progress' => $currentProgress]);
-    /* ---------- ADMIN: USER ---------- */
+        jsonOk(['progress' => $currentProgress]);    /* ---------- ADMIN: USER ---------- */
 
     case 'add_user':
         requireRole(['admin']);
