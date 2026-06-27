@@ -23,10 +23,10 @@ try { runMigrations(Database::getConnection()); } catch (Throwable $e) { error_l
 // Serve index.html, patch.js akan memanggil api.php?action=check_session
 // untuk memverifikasi session ke server setiap kali halaman dibuka.
 // Dengan begitu user yang belum login selalu diarahkan ke halaman login.
-$html = file_get_contents(__DIR__ . '/index.html');
+$html = file_get_contents(__DIR__ . '/app.html');
 
 // Cache-busting: tambahkan versi berdasarkan waktu modifikasi file
-$ver = filemtime(__DIR__ . '/index.html') ?: time();
+$ver = filemtime(__DIR__ . '/app.html') ?: time();
 
 // Sisipkan patch.js setelah app.js dengan versi cache-busting
 $html = str_replace(
