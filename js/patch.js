@@ -752,7 +752,19 @@ function simpanNilai(kelompokId) {
   smpmPost('save_penilaian', { kelompok_id: kelompokId, nilai: nilaiVal, feedback: feedback })
     .then(function(res) {
       if (!res.ok) { showToast(res.message || 'Gagal simpan penilaian.', 'error'); return; }
+
+      // Update progress di DB lokal langsung agar tidak perlu refresh
+      var newProgress = (res.data && res.data.progress !== undefined) ? +res.data.progress : nilaiVal;
+      var kel = DB.kelompok.find(function(k) { return +k.id === +kelompokId; });
+      if (kel) kel.progress = newProgress;
+
+      // Update penilaian di DB lokal
+      var pnl = DB.penilaian.find(function(p) { return +p.kelompok_id === +kelompokId; });
+      if (pnl) { pnl.nilai = nilaiVal; pnl.feedback = feedback; }
+      else DB.penilaian.push({ kelompok_id: +kelompokId, nilai: nilaiVal, feedback: feedback, dosen_id: +currentUser.id });
+
       smpmLoadDB().then(function() {
+        // Update grade badge langsung
         var gradeEl = document.getElementById('grade-' + kelompokId);
         if (gradeEl) {
           gradeEl.innerHTML = nilaiVal >= 85 ? '<span class="badge badge-green">A</span>'
@@ -760,7 +772,17 @@ function simpanNilai(kelompokId) {
             : nilaiVal >= 55 ? '<span class="badge badge-amber">C</span>'
             : '<span class="badge badge-red">D</span>';
         }
-        showToast('Nilai berhasil disimpan!', 'success');
+        // Update progress bar langsung tanpa reload halaman
+        var progWrap = document.querySelector('[data-kel-progress="' + kelompokId + '"]');
+        if (progWrap) {
+          var fill = progWrap.querySelector('.progress-fill');
+          if (fill) fill.style.width = newProgress + '%';
+          var label = progWrap.querySelector('.prog-label');
+          if (label) label.textContent = newProgress + '%';
+        }
+        showToast('Nilai berhasil disimpan! Progress kelompok: ' + newProgress + '%', 'success');
+        // Re-render halaman penilaian agar semua data fresh
+        if (typeof renderPage === 'function') renderPage('penilaian');
       });
     })
     .catch(function(err) { smpmHandleError(err); });
