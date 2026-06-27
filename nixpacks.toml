@@ -5,4 +5,4 @@ nixPkgs = ["php84", "php84Extensions.pdo_mysql", "php84Extensions.pdo", "php84Ex
 cmds = []
 
 [start]
-cmd = "php -c php.ini -S 0.0.0.0:$PORT -t ."
+cmd = "php -c php.ini -S 0.0.0.0:$PORT router.php"
